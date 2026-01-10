@@ -11,9 +11,9 @@ on:
         default: false
 
 env:
-  ALPINE_VERSION: "3.22"
-  ALPINE_ARCH: "aarch64"
-  IMAGE_SIZE: "512M"
+  ALPINE_VERSION: "3.23"
+  ALPINE_ARCH: "armhf"
+  IMAGE_SIZE: "1G"
   BOOT_SIZE: "256M"
 
 jobs:
@@ -210,6 +210,7 @@ jobs:
         
         # Install base packages plus WiFi support, sudo, and dhcpcd
         echo "Installing packages..."
+        mkdir /etc/security
         apk add --no-cache \
           alpine-base \
           openrc \
@@ -225,7 +226,9 @@ jobs:
           openssl \
           sudo \
           tzdata \
-          dhcpcd
+          dhcpcd \
+          cage \
+          epiphany
         
         # Install Raspberry Pi kernels from RasPINE repo
         # Using --force-overwrite to handle overlay conflicts between packages
