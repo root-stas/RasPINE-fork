@@ -36,7 +36,7 @@ on:
         options:
           - 'all'
           - '3.22'
-          - '3.21'
+          - '3.23'
       package_types:
         description: 'Which packages to fetch'
         required: true
@@ -58,7 +58,7 @@ jobs:
         id: versions
         run: |
           if [ "${{ inputs.alpine_version }}" = "all" ]; then
-            echo 'versions=["3.22","3.21"]' >> $GITHUB_OUTPUT
+            echo 'versions=["3.22","3.23"]' >> $GITHUB_OUTPUT
           else
             echo 'versions=["${{ inputs.alpine_version }}"]' >> $GITHUB_OUTPUT
           fi
@@ -318,7 +318,7 @@ jobs:
           fi
           
           # Copy v8 packages from aarch64 to armhf
-          for ver in 3.22 3.21; do
+          for ver in 3.22 3.23; do
             if [ -d "v${ver}/community/aarch64" ] && [ -d "v${ver}/community/armhf" ]; then
               cp -f "v${ver}/community/aarch64"/raspios-kernel-v8*.apk "v${ver}/community/armhf/" 2>/dev/null || true
             fi
@@ -420,7 +420,7 @@ jobs:
           chmod 600 keys/raspine.rsa
           chmod 644 keys/raspine.rsa.pub
           
-          for ver in 3.22 3.21; do
+          for ver in 3.22 3.23; do
             for arch in armhf aarch64; do
               REPO="v${ver}/community/${arch}"
               [ ! -d "$REPO" ] && continue
@@ -509,7 +509,7 @@ jobs:
           {
             "repository": "RasPINE APK Repository",
             "updated": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "alpine_versions": ["3.22", "3.21"],
+            "alpine_versions": ["3.22", "3.23"],
             "architectures": ["armhf", "aarch64"],
             "kernel_version": "${KERNEL_VERSION_DISPLAY}"
           }
