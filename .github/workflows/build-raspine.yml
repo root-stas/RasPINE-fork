@@ -11,9 +11,9 @@ on:
         default: false
 
 env:
-  ALPINE_VERSION: "3.22"
-  ALPINE_ARCH: "armhf"
-  IMAGE_SIZE: "2G"
+  ALPINE_VERSION: "3.23"
+  ALPINE_ARCH: "aarch64"
+  IMAGE_SIZE: "512"
   BOOT_SIZE: "256M"
 
 jobs:
