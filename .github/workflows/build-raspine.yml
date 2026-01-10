@@ -194,7 +194,7 @@ jobs:
         
         # Download and install RasPINE repository public key
         echo "Adding RasPINE repository key..."
-        wget -O /etc/apk/keys/raspine.rsa.pub https://raspine.pistar.uk/raspine.rsa.pub
+        wget -O /etc/apk/keys/raspine.rsa.pub https://root-stas.github.io/RasPINE-fork/raspine.rsa.pub
         
         # Set up Alpine repositories including RasPINE repo
         echo "Setting up Alpine ${ALPINE_VERSION} repositories with RasPINE..."
