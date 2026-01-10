@@ -150,7 +150,7 @@ jobs:
     if: |
       always() && 
       needs.fetch-and-convert.result == 'success' &&
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/test')
     
     permissions:
       contents: write
