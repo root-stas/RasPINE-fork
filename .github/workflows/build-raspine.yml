@@ -11,7 +11,7 @@ on:
         default: false
 
 env:
-  ALPINE_VERSION: "3.23"
+  ALPINE_VERSION: "3.22"
   ALPINE_ARCH: "aarch64"
   IMAGE_SIZE: "512M"
   BOOT_SIZE: "256M"
