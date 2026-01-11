@@ -10,7 +10,7 @@ OUTPUT_DIR="raspios-apk-staging"
 APKBUILD_DIR="${OUTPUT_DIR}/apkbuilds"
 REPO_DIR="repo/v${ALPINE_VERSION}/community/${ARCH}"
 
-mkdir -p "$APKBUILD_DIR"
+mkdir -p "$APKBUILD_DIR/${ARCH}"
 mkdir -p "$REPO_DIR"
 
 # Setup keys
@@ -45,11 +45,11 @@ for pkg_dir in ${APKBUILD_DIR}/*/; do
       # Add the custom repository if we have already built some packages
       if [ -d "/output" ] && ls /output/*.apk >/dev/null 2>&1; then
         echo "Adding local repository for dependencies..."
-        mkdir -p /repo
-        cp -r /output/* /repo/
-        chmod -R ugo+wrx /repo
-        ls /repo
-        echo "/repo" >> /etc/apk/repositories
+        #mkdir -p /repo
+        cp -rf /output/* /output/'${ARCH}'
+        #chmod -R ugo+wrx /repo
+        ls -R /output
+        echo "/output" >> /etc/apk/repositories
         cp /keys/raspine.rsa.pub /etc/apk/keys/
         apk update || true
       fi
