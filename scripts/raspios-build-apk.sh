@@ -10,11 +10,9 @@ OUTPUT_DIR="raspios-apk-staging"
 APKBUILD_DIR="${OUTPUT_DIR}/apkbuilds"
 REPO_DIR="repo/v${ALPINE_VERSION}/community/${ARCH}"
 
-ls "$APKBUILD_DIR"
 if [ -e "$APKBUILD_DIR" ]; then
   mkdir -p "$APKBUILD_DIR"
 fi
-ls "$APKBUILD_DIR"
 mkdir -p "$REPO_DIR"
 
 # Setup keys
@@ -64,7 +62,7 @@ for pkg_dir in ${APKBUILD_DIR}/*/; do
       fi
       
       # Create builder user
-      adduser -D builder
+      adduser -D builder -h /home/builder
       addgroup builder abuild
       echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
       
@@ -116,7 +114,7 @@ CONF
       
       # Build the package with signing
       echo "Building package with abuild..."
-      su -c "cd /home/builder/package && ls && abuild -r -C /home/builder/package" builder
+      su -c "cd /home/builder/package && abuild -r" builder
       
       # The packages should now be signed. Copy them to output
       if [ -d "/home/builder/packages" ]; then
