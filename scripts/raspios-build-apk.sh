@@ -45,9 +45,9 @@ for pkg_dir in ${APKBUILD_DIR}/*/; do
       # Add the custom repository if we have already built some packages
       if [ -d "/output" ] && ls /output/*.apk >/dev/null 2>&1; then
         echo "Adding local repository for dependencies..."
-        echo "/output" >> /etc/apk/repositories
-        ls /output
-        cat /etc/apk/repositories
+        mkdir -p /repo
+        cp -r /output/* /repo/
+        echo "/repo" >> /etc/apk/repositories
         cp /keys/raspine.rsa.pub /etc/apk/keys/
         apk update || true
       fi
