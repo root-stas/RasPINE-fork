@@ -12,7 +12,6 @@ REPO_DIR="repo/v${ALPINE_VERSION}/community/${ARCH}"
 
 mkdir -p "$APKBUILD_DIR"
 mkdir -p "$REPO_DIR"
-mkdir -p "$REPO_DIR/${ARCH}"
 
 # Setup keys
 TEMP_KEY_DIR=$(mktemp -d)
@@ -46,11 +45,12 @@ for pkg_dir in ${APKBUILD_DIR}/*/; do
       # Add the custom repository if we have already built some packages
       if [ -d "/output" ] && ls /output/*.apk >/dev/null 2>&1; then
         echo "Adding local repository for dependencies..."
-        #mkdir -p /repo
-        cp -rf /output/* /output/'${ARCH}'
-        #chmod -R ugo+wrx /repo
-        ls -R /output
-        echo "/output" >> /etc/apk/repositories
+        mkdir -p /repo
+        mkdir -p /repo/'${ARCH}'
+        cp -rf /output/* /repo/'${ARCH}'/
+        chmod -R ugo+wrx /repo
+        ls -R /repo
+        echo "/repo" >> /etc/apk/repositories
         cp /keys/raspine.rsa.pub /etc/apk/keys/
         apk update || true
       fi
