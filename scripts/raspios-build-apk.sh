@@ -10,6 +10,11 @@ OUTPUT_DIR="raspios-apk-staging"
 APKBUILD_DIR="${OUTPUT_DIR}/apkbuilds"
 REPO_DIR="repo/v${ALPINE_VERSION}/community/${ARCH}"
 
+ls "$APKBUILD_DIR"
+if [ -e "$APKBUILD_DIR" ]; then
+  mkdir -p "$APKBUILD_DIR"
+fi
+ls "$APKBUILD_DIR"
 mkdir -p "$REPO_DIR"
 
 # Setup keys
