@@ -10,9 +10,7 @@ OUTPUT_DIR="raspios-apk-staging"
 APKBUILD_DIR="${OUTPUT_DIR}/apkbuilds"
 REPO_DIR="repo/v${ALPINE_VERSION}/community/${ARCH}"
 
-if [ -e "$APKBUILD_DIR" ]; then
-  mkdir -p "$APKBUILD_DIR"
-fi
+mkdir -p "$APKBUILD_DIR"
 mkdir -p "$REPO_DIR"
 
 # Setup keys
@@ -40,7 +38,6 @@ for pkg_dir in ${APKBUILD_DIR}/*/; do
     "alpine:${ALPINE_VERSION}" \
     sh -c '
       set -e
-      cp /keys/raspine.rsa.pub /output
       
       # Install build tools
       apk add --no-cache alpine-sdk sudo
@@ -49,6 +46,8 @@ for pkg_dir in ${APKBUILD_DIR}/*/; do
       if [ -d "/output" ] && ls /output/*.apk >/dev/null 2>&1; then
         echo "Adding local repository for dependencies..."
         echo "/output" >> /etc/apk/repositories
+        ls /output
+        cat /etc/apk/repositories
         cp /keys/raspine.rsa.pub /etc/apk/keys/
         apk update || true
       fi
@@ -115,10 +114,7 @@ CONF
       
       # Build the package with signing
       echo "Building package with abuild..."
-      echo "root ls"
-      ls /build
-      ls /output
-      su -c "cd /home/builder/package && ls /output && ls /build && abuild -r -C ." builder
+      su -c "cd /home/builder/package && abuild -r" builder
       
       # The packages should now be signed. Copy them to output
       if [ -d "/home/builder/packages" ]; then
