@@ -11,9 +11,9 @@ on:
         default: false
 
 env:
-  ALPINE_VERSION: "3.23"
+  ALPINE_VERSION: "3.22"
   ALPINE_ARCH: "armhf"
-  IMAGE_SIZE: "1G"
+  IMAGE_SIZE: "2G"
   BOOT_SIZE: "256M"
 
 jobs:
@@ -194,6 +194,7 @@ jobs:
         
         # Download and install RasPINE repository public key
         echo "Adding RasPINE repository key..."
+        #wget -O /etc/apk/keys/raspine.rsa.pub https://raspine.pistar.uk/raspine.rsa.pub
         wget -O /etc/apk/keys/raspine.rsa.pub https://root-stas.github.io/RasPINE-fork/raspine.rsa.pub
         
         # Set up Alpine repositories including RasPINE repo
@@ -201,6 +202,7 @@ jobs:
         cat > /etc/apk/repositories << REPOS
         https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION}/main
         https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION}/community
+        #https://raspine.pistar.uk/v${ALPINE_VERSION}/community
         https://root-stas.github.io/RasPINE-fork/v${ALPINE_VERSION}/community
         REPOS
         
@@ -210,7 +212,6 @@ jobs:
         
         # Install base packages plus WiFi support, sudo, and dhcpcd
         echo "Installing packages..."
-        mkdir /etc/security
         apk add --no-cache \
           alpine-base \
           openrc \
@@ -226,9 +227,7 @@ jobs:
           openssl \
           sudo \
           tzdata \
-          dhcpcd \
-          cage \
-          epiphany
+          dhcpcd
         
         # Install Raspberry Pi kernels from RasPINE repo
         # Using --force-overwrite to handle overlay conflicts between packages
