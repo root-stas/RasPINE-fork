@@ -40,6 +40,7 @@ for pkg_dir in ${APKBUILD_DIR}/*/; do
     "alpine:${ALPINE_VERSION}" \
     sh -c '
       set -e
+      cp /keys/raspine.rsa.pub /output
       
       # Install build tools
       apk add --no-cache alpine-sdk sudo
@@ -117,7 +118,7 @@ CONF
       echo "root ls"
       ls /build
       ls /output
-      su -c "cd /home/builder/package && echo 'builder ls' && ls /output && ls /build && abuild -r -C ." builder
+      su -c "cd /home/builder/package && ls /output && ls /build && abuild -r -C ." builder
       
       # The packages should now be signed. Copy them to output
       if [ -d "/home/builder/packages" ]; then
