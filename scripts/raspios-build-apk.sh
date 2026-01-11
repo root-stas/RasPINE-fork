@@ -47,6 +47,8 @@ for pkg_dir in ${APKBUILD_DIR}/*/; do
         echo "Adding local repository for dependencies..."
         mkdir -p /repo
         cp -r /output/* /repo/
+        chmod -R ugo+wrx /repo
+        ls /repo
         echo "/repo" >> /etc/apk/repositories
         cp /keys/raspine.rsa.pub /etc/apk/keys/
         apk update || true
