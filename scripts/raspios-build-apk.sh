@@ -111,7 +111,7 @@ CONF
       
       # Build the package with signing
       echo "Building package with abuild..."
-      su -c "cd /home/builder/package && ls && abuild checksum && abuild -r" builder
+      su -c "cd /home/builder/package && ls && abuild -r -C /home/builder/package" builder
       
       # The packages should now be signed. Copy them to output
       if [ -d "/home/builder/packages" ]; then
