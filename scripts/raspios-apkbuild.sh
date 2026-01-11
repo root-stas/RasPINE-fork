@@ -149,10 +149,13 @@ package() {
 	cd "\$srcdir"
 	
 	# Ensure pkgdir exists
+	echo "\$pkgdir"
+	echo "1"
 	mkdir -p "\$pkgdir"
 	
 	# Copy all files from the extracted directory to pkgdir
 	if [ -d "raspios-firmware" ]; then
+		echo "2"
 		cd "raspios-firmware"
 		# Copy directory structure  
 		find . -type d -exec mkdir -p "\$pkgdir/{}" \;
@@ -162,18 +165,22 @@ package() {
 		find . -type l -exec cp -a {} "\$pkgdir/{}" \;
 		cd "\$srcdir"
 	fi
+	echo "3"
 	
 	# Install config files if present
 	if [ -f "\$srcdir/config.txt" ]; then
+		echo "4"
 		install -Dm644 "\$srcdir/config.txt" "\$pkgdir/boot/firmware/config.txt"
 	fi
 	
 	if [ -f "\$srcdir/cmdline.txt" ]; then
+		echo "5"
 		install -Dm644 "\$srcdir/cmdline.txt" "\$pkgdir/boot/firmware/cmdline.txt"
 	fi
 	
 	# Create symlinks in /boot pointing to /boot/firmware
 	if [ -f "\$srcdir/config.txt" ] || [ -f "\$srcdir/cmdline.txt" ]; then
+		echo "6"
 		mkdir -p "\$pkgdir/boot"
 		cd "\$pkgdir/boot"
 		
@@ -187,6 +194,7 @@ package() {
 		
 		cd "\$srcdir"
 	fi
+	echo "7"
 	
 	# Ensure at least an empty package is created
 	mkdir -p "\$pkgdir/usr/share/doc/raspios-firmware"
