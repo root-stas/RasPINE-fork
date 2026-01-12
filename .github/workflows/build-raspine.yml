@@ -247,12 +247,11 @@ jobs:
           dbus \
           nano \
           htop \
+          networkmanager \
           python3 \
           py3-smbus \
           py3-rpigpio \
-          i2c-tools \
-          greetd
-        #  elogind
+          i2c-tools
         
         # Install Raspberry Pi kernels from RasPINE repo
         # Using --force-overwrite to handle overlay conflicts between packages
@@ -291,8 +290,6 @@ jobs:
         rc-update add wpa_supplicant boot
         rc-update add dhcpcd boot
         rc-update add dbus default
-        # rc-update add elogind default
-        rc-update add greetd default
         
         # Configure hostname
         echo "cfpp-100ac" > /etc/hostname
@@ -318,7 +315,7 @@ jobs:
         
         # Configure SSH - key only by default
         mkdir -p /etc/conf.d
-        echo 'DROPBEAR_OPTS="-B"' > /etc/conf.d/dropbear
+        echo 'DROPBEAR_OPTS="-B -s"' > /etc/conf.d/dropbear
         
         # Configure wpa_supplicant service to not fail if no config
         echo 'wpa_supplicant_args="-q"' > /etc/conf.d/wpa_supplicant
@@ -330,17 +327,15 @@ jobs:
         mkdir -p /boot/firmware
         mkdir -p /var/log
         mkdir -p /usr/local/bin
-        mkdir -p /etc/greetd
+        mkdir -p /etc/NetworkManager
+        mkdir -p /etc/NetworkManager/system-connections
 
-        cat > /etc/greetd/config.toml << GRET_EOF
-        [terminal]
-        vt = 1
-        [default_session]
-        #command = "agreety --cmd /bin/sh"
-        #command = "cage -s -- /home/raspine/cage-launch.sh"
-        command = "/boot/firmware/cfpp-100ac/startup.sh"
-        user = "cfpp-100ac"
-        GRET_EOF
+        cat >> /etc/conf.d/hwclock << CLK_EOF
+        start_pre() {
+            einfo "Creating RTC device";
+            echo ds3231 0x68 > /sys/bus/i2c/devices/i2c-1/new_device
+        }
+        CLK_EOF
         
         # Create home directory structure for cfpp-100ac
         mkdir -p /home/cfpp-100ac
@@ -356,6 +351,7 @@ jobs:
         rfkill
         i2c-dev
         spidev
+        i2c:ds3231
         MODULES
         
         # Create modprobe configuration for brcmfmac
