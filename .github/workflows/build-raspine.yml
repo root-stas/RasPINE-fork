@@ -289,7 +289,8 @@ jobs:
         rc-update add dropbear default
         rc-update add wpa_supplicant boot
         rc-update add dhcpcd boot
-        rc-update add dbus default
+        rc-update add dbus boot
+        rc-update add hwclock boot
         
         # Configure hostname
         echo "cfpp-100ac" > /etc/hostname
