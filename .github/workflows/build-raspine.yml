@@ -330,6 +330,7 @@ jobs:
         mkdir -p /boot/firmware
         mkdir -p /var/log
         mkdir -p /usr/local/bin
+        mkdir -p /etc/greetd
 
         cat > /etc/greetd/config.toml << GRET_EOF
         [terminal]
