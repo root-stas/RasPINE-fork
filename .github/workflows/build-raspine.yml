@@ -518,13 +518,13 @@ jobs:
             fi
             
             # Fix configuration file
-            echo "dtoverlay=i2c-rtc,ds3231" | sudo tee -a /mnt/boot/config.txt
-            echo "dtoverlay=vc4-kms-dsi-waveshare-panel-v2,10_1_inch_a" | sudo tee -a /mnt/boot/config.txt
-            echo "display_auto_detect=0" | sudo tee -a /mnt/boot/config.txt
-            echo "camera_auto_detect=0" | sudo tee -a /mnt/boot/config.txt
+            echo "dtoverlay=i2c-rtc,ds3231" | sudo tee -a /mnt/boot/config.txt > /dev/null
+            echo "dtoverlay=vc4-kms-dsi-waveshare-panel-v2,10_1_inch_a" | sudo tee -a /mnt/boot/config.txt > /dev/null
+            echo "display_auto_detect=0" | sudo tee -a /mnt/boot/config.txt > /dev/null
+            echo "camera_auto_detect=0" | sudo tee -a /mnt/boot/config.txt > /dev/null
             
             echo "Boot files copied from raspios-firmware package:"
-            echo "  - config.txt: $(head -1 /mnt/boot/config.txt)"
+            echo "  - config.txt: $(cat /mnt/boot/config.txt)"
             echo "  - cmdline.txt: $(cat /mnt/boot/cmdline.txt)"
         else
             echo "ERROR: No boot files found in /boot/firmware - check raspios-firmware package!"
