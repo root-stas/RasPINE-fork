@@ -247,10 +247,14 @@ jobs:
           dbus \
           nano \
           htop \
-          python3 \
+          python3-dev \
           py3-smbus \
           py3-rpigpio \
-          i2c-tools
+          i2c-tools \
+          py3-pip \
+          py3-zstandard \
+          patchelf \
+          clang
         
         # Install Raspberry Pi kernels from RasPINE repo
         # Using --force-overwrite to handle overlay conflicts between packages
