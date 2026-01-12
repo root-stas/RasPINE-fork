@@ -243,7 +243,16 @@ jobs:
           openssl \
           sudo \
           tzdata \
-          dhcpcd
+          dhcpcd \
+          dbus \
+          nano \
+          htop \
+          python3 \
+          py3-smbus \
+          py3-rpigpio \
+          i2c-tools \
+          elogind \
+          greetd
         
         # Install Raspberry Pi kernels from RasPINE repo
         # Using --force-overwrite to handle overlay conflicts between packages
@@ -281,6 +290,9 @@ jobs:
         rc-update add dropbear default
         rc-update add wpa_supplicant boot
         rc-update add dhcpcd boot
+        rc-update add dbus default
+        rc-update add elogind default
+        rc-update add greetd default
         
         # Configure hostname
         echo "cfpp-100ac" > /etc/hostname
@@ -318,6 +330,16 @@ jobs:
         mkdir -p /boot/firmware
         mkdir -p /var/log
         mkdir -p /usr/local/bin
+
+        cat > /etc/greetd/config.toml << GRET_EOF
+        [terminal]
+        vt = 1
+        [default_session]
+        #command = "agreety --cmd /bin/sh"
+        #command = "cage -s -- /home/raspine/cage-launch.sh"
+        command = "/boot/firmware/cfpp-100ac/startup.sh"
+        user = "cfpp-100ac"
+        GRET_EOF
         
         # Create home directory structure for cfpp-100ac
         mkdir -p /home/cfpp-100ac
