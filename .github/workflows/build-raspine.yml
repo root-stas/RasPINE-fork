@@ -286,6 +286,7 @@ jobs:
         rc-update add bootmisc boot
         rc-update add syslog boot
         rc-update add dropbear default
+        rc-update add crond default
         rc-update add wpa_supplicant boot
         rc-update add dhcpcd boot
         rc-update add dbus boot
@@ -515,16 +516,9 @@ jobs:
                 echo "ERROR: config.txt not found - raspios-firmware package issue!"
                 exit 1
             fi
-
-            # Create sample configuration file for the boot partition
-            sudo tee /mnt/boot/config.txt << 'EOF'
-            # RasPINE /boot/firmware/config.txt
-            # For more options and information see
-            # http://rptl.io/configtxt
-            # Some settings may impact device functionality. See link above for details
-            # Additional overlays and parameters are documented
-            # /boot/firmware/overlays/README
             
+            # Create sample configuration file for the boot partition
+            sudo tee /mnt/boot/config.txt << 'EOF'            
             # Automatically load overlays for detected cameras
             camera_auto_detect=0
             
