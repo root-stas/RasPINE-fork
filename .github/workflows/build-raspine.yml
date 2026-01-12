@@ -9,10 +9,26 @@ on:
         description: 'Enable debug mode'
         required: false
         default: false
+      alpine_arch:
+        description: 'Build OS architecture'
+        required: true
+        default: 'armhf'
+        type: choice
+        options:
+          - armhf
+          - aarch64
+      alpine_version:
+        description: 'Alpine version to build for'
+        required: true
+        default: '3.22'
+        type: choice
+        options:
+          - '3.22'
+          - '3.23'
 
 env:
-  ALPINE_VERSION: "3.22"
-  ALPINE_ARCH: "armhf"
+  ALPINE_VERSION: "${{ inputs.alpine_version }}"
+  ALPINE_ARCH: "${{ inputs.alpine_arch }}"
   IMAGE_SIZE: "2G"
   BOOT_SIZE: "256M"
 
@@ -231,12 +247,18 @@ jobs:
         
         # Install Raspberry Pi kernels from RasPINE repo
         # Using --force-overwrite to handle overlay conflicts between packages
-        echo "Installing Raspberry Pi kernels from RasPINE repo..."
-        apk add --no-cache --force-overwrite \
+        echo "Installing Raspberry Pi kernels from RasPINE repo... ${ALPINE_ARCH}"
+        if [ "${ALPINE_ARCH}" == "armhf" ]; then
+          apk add --no-cache --force-overwrite \
           raspios-firmware \
           raspios-kernel-v6 \
           raspios-kernel-v7 \
           raspios-kernel-v8
+        else
+          apk add --no-cache --force-overwrite \
+          raspios-firmware \
+          raspios-kernel-v8
+        fi
         
         # Fix the mkinitfs trigger error by creating the directory/file it expects
         mkdir -p /boot
@@ -261,29 +283,30 @@ jobs:
         rc-update add dhcpcd boot
         
         # Configure hostname
-        echo "raspine" > /etc/hostname
+        echo "cfpp-100ac" > /etc/hostname
         
         # Configure hosts file
         cat > /etc/hosts << HOSTS
-        127.0.0.1   localhost localhost.localdomain
-        127.0.1.1   raspine
+        127.0.0.1   cfpp-100ac cfpp-100ac.localdomain localhost localhost.localdomain
+        127.0.1.1   cfpp-100ac cfpp-100ac.localdomain localhost localhost.localdomain
+        ::1   cfpp-100ac cfpp-100ac.localdomain localhost localhost.localdomain
         HOSTS
         
-        # Create raspine user with sudo access
-        echo "Creating raspine user..."
-        adduser -D -s /bin/sh raspine
-        addgroup raspine wheel
-        echo "raspine:raspberry" | chpasswd
+        # Create cfpp-100ac user with sudo access
+        echo "Creating cfpp-100ac user..."
+        adduser -D -s /bin/sh cfpp-100ac
+        addgroup cfpp-100ac wheel
+        echo "cfpp-100ac:12345678" | chpasswd
         
         # Configure sudo for wheel group (passwordless)
         echo "%wheel ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/wheel
         
         # Disable root password login (can still sudo)
-        passwd -l root
+        #passwd -l root
         
         # Configure SSH - key only by default
         mkdir -p /etc/conf.d
-        echo 'DROPBEAR_OPTS="-B -s"' > /etc/conf.d/dropbear
+        echo 'DROPBEAR_OPTS="-B"' > /etc/conf.d/dropbear
         
         # Configure wpa_supplicant service to not fail if no config
         echo 'wpa_supplicant_args="-q"' > /etc/conf.d/wpa_supplicant
@@ -296,9 +319,9 @@ jobs:
         mkdir -p /var/log
         mkdir -p /usr/local/bin
         
-        # Create home directory structure for raspine
-        mkdir -p /home/raspine
-        chown raspine:raspine /home/raspine
+        # Create home directory structure for cfpp-100ac
+        mkdir -p /home/cfpp-100ac
+        chown cfpp-100ac:cfpp-100ac /home/cfpp-100ac
         
         # Add Broadcom WiFi modules to load at boot
         echo "Adding WiFi spi/i2c modules to auto-load..."
@@ -324,7 +347,7 @@ jobs:
         # Set regulatory domain
         cat > /etc/modprobe.d/cfg80211.conf << REGCONF
         # Set regulatory domain
-        options cfg80211 ieee80211_regdom=GB
+        options cfg80211 ieee80211_regdom=UA
         REGCONF
         
         # Fix rfkill configuration
@@ -447,7 +470,7 @@ jobs:
         ctrl_interface=/var/run/wpa_supplicant
         ctrl_interface_group=0
         update_config=1
-        country=GB
+        country=UA
         
         # Networks will be added by raspine-config at boot
         EOF
@@ -563,13 +586,13 @@ jobs:
                     
                 # User configuration
                 user_password)
-                    log "Setting raspine user password"
-                    # Create raspine user if it doesn't exist
-                    if ! id raspine >/dev/null 2>&1; then
-                        adduser -D -s /bin/sh raspine
-                        addgroup raspine wheel
+                    log "Setting cfpp-100ac user password"
+                    # Create cfpp-100ac user if it doesn't exist
+                    if ! id cfpp-100ac >/dev/null 2>&1; then
+                        adduser -D -s /bin/sh cfpp-100ac
+                        addgroup cfpp-100ac wheel
                     fi
-                    echo "raspine:$value" | chpasswd
+                    echo "cfpp-100ac:$value" | chpasswd
                     ;;
                     
                 enable_ssh_password)
@@ -585,18 +608,18 @@ jobs:
                     
                 ssh_key)
                     log "Adding SSH public key"
-                    # Create raspine user if needed
-                    if ! id raspine >/dev/null 2>&1; then
-                        adduser -D -s /bin/sh raspine
-                        addgroup raspine wheel
+                    # Create cfpp-100ac user if needed
+                    if ! id cfpp-100ac >/dev/null 2>&1; then
+                        adduser -D -s /bin/sh cfpp-100ac
+                        addgroup cfpp-100ac wheel
                     fi
                     
                     # Add SSH key
-                    mkdir -p /home/raspine/.ssh
-                    echo "$value" >> /home/raspine/.ssh/authorized_keys
-                    chmod 700 /home/raspine/.ssh
-                    chmod 600 /home/raspine/.ssh/authorized_keys
-                    chown -R raspine:raspine /home/raspine/.ssh
+                    mkdir -p /home/cfpp-100ac/.ssh
+                    echo "$value" >> /home/cfpp-100ac/.ssh/authorized_keys
+                    chmod 700 /home/cfpp-100ac/.ssh
+                    chmod 600 /home/cfpp-100ac/.ssh/authorized_keys
+                    chown -R cfpp-100ac:cfpp-100ac /home/cfpp-100ac/.ssh
                     ;;
                     
                 # System configuration
@@ -705,14 +728,14 @@ jobs:
         #wifi_password_4=CoffeeShopPassword
         
         # WiFi country code (affects available channels and power limits)
-        wifi_country=GB
+        wifi_country=UA
         
         # Allow connection to open networks (no password) - use with caution!
         enable_open_networks=false
         
         # === USER SECURITY ===
-        # Set password for raspine user (required for SSH password auth)
-        user_password=raspberry
+        # Set password for cfpp-100ac user (required for SSH password auth)
+        user_password=12345678
         
         # Enable SSH password authentication (default: key-only)
         enable_ssh_password=true
@@ -721,13 +744,13 @@ jobs:
         #ssh_key=ssh-rsa AAAAB3NzaC1yc2EAAAA... your-email@example.com
         
         # === SYSTEM CONFIGURATION ===
-        hostname=raspine
-        timezone=Europe/London
-        locale=en_GB.UTF-8
+        hostname=cfpp-100ac
+        timezone=Europe/Kyiv
+        locale=en_US.UTF-8
         
         # === SECURITY NOTES ===
         # • Root account is disabled by default (secure)
-        # • raspine user has passwordless sudo access
+        # • cfpp-100ac user has passwordless sudo access
         # • SSH password authentication is disabled unless explicitly enabled
         # • THIS FILE WILL BE DELETED after processing for security
         # • WiFi networks are tried in order of priority (higher numbers first)
@@ -777,8 +800,8 @@ jobs:
         SHA256: $(cut -d' ' -f1 < "RasPINE-${BUILD_DATE}.img.xz.sha256")
         
         Default Credentials:
-        Username: raspine
-        Password: raspberry
+        Username: cfpp-100ac
+        Password: 12345678
         
         Network: DHCP on eth0
         SSH: Enabled (Dropbear)
