@@ -517,57 +517,13 @@ jobs:
                 exit 1
             fi
             
-            # Create sample configuration file for the boot partition
+            # Create configuration file
             sudo tee /mnt/boot/config.txt << 'EOF'
-            # Automatically load overlays for detected cameras
             camera_auto_detect=0
-            
-            # Automatically load overlays for detected DSI displays
             display_auto_detect=0
-            
-            # Automatically load initramfs files, if found
             auto_initramfs=1
-            
-            # Don't have the firmware create an initial video= setting in cmdline.txt.
-            # Use the kernel's default instead.
             disable_fw_kms_setup=1
-            
-            # Disable compensation for displays with overscan
             disable_overscan=1
-            
-            # Model Specifics
-            [pi0]
-            dtoverlay=vc4-fkms-v3d
-            max_framebuffers=1
-            gpu_mem=16
-            kernel=kernel.img
-            dtoverlay=miniuart-bt
-            
-            [pi1]
-            dtoverlay=vc4-fkms-v3d
-            max_framebuffers=1
-            gpu_mem=16
-            kernel=kernel.img
-            
-            [pi2]
-            dtoverlay=vc4-fkms-v3d
-            max_framebuffers=1
-            gpu_mem=16
-            kernel=kernel7.img
-            
-            [pi3]
-            dtoverlay=vc4-fkms-v3d
-            max_framebuffers=1
-            gpu_mem=16
-            kernel=kernel8.img
-            dtoverlay=miniuart-bt
-            
-            [pi3+]
-            dtoverlay=vc4-fkms-v3d
-            max_framebuffers=1
-            gpu_mem=16
-            kernel=kernel8.img
-            dtoverlay=miniuart-bt
             
             [pi02]
             dtoverlay=vc4-fkms-v3d
@@ -576,20 +532,6 @@ jobs:
             kernel=kernel8.img
             dtoverlay=miniuart-bt
             
-            [pi4]
-            dtoverlay=vc4-kms-v3d,noaudio
-            max_framebuffers=2
-            gpu_mem=64
-            kernel=kernel8.img
-            dtoverlay=miniuart-bt
-            
-            [cm4]
-            dtoverlay=vc4-kms-v3d,noaudio
-            max_framebuffers=2
-            gpu_mem=64
-            kernel=kernel8.img
-            otg_mode=1
-            
             [pi5]
             dtoverlay=vc4-kms-v3d,noaudio
             max_framebuffers=2
@@ -597,13 +539,6 @@ jobs:
             kernel=kernel8.img
             dtoverlay=miniuart-bt
             dtoverlay=vc4-kms-dsi-waveshare-panel-v2,10_1_inch_a
-            
-            [cm5]
-            dtoverlay=vc4-kms-v3d,noaudio
-            max_framebuffers=2
-            gpu_mem=64
-            kernel=kernel8.img
-            dtoverlay=dwc2,dr_mode=host
             
             [all]
             temp_limit=75
