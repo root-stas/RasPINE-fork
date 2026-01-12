@@ -29,7 +29,7 @@ on:
 env:
   ALPINE_VERSION: "${{ inputs.alpine_version }}"
   ALPINE_ARCH: "${{ inputs.alpine_arch }}"
-  IMAGE_SIZE: "2G"
+  IMAGE_SIZE: "1500M"
   BOOT_SIZE: "256M"
 
 jobs:
@@ -251,8 +251,8 @@ jobs:
           py3-smbus \
           py3-rpigpio \
           i2c-tools \
-          elogind \
           greetd
+        #  elogind
         
         # Install Raspberry Pi kernels from RasPINE repo
         # Using --force-overwrite to handle overlay conflicts between packages
@@ -291,7 +291,7 @@ jobs:
         rc-update add wpa_supplicant boot
         rc-update add dhcpcd boot
         rc-update add dbus default
-        rc-update add elogind default
+        # rc-update add elogind default
         rc-update add greetd default
         
         # Configure hostname
