@@ -336,7 +336,8 @@ jobs:
         cat > /boot/firmware/cfpp-100ac/startup.sh << ASF
         #!/bin/sh
         # restart networking
-        iw dev wlan0 interface add uap0 type __ap
+        iw dev wlan0 interface add uap0 type __ap addr 11:22:33:11:22:33
+        wpa_supplicant -iuap0 -c/etc/wpa_supplicant/wpa_supplicant_uap0.conf
         rc-service networking restart
         # start firmware
         /usr/bin/python3 /boot/firmware/cfpp-100ac/main.py
@@ -359,8 +360,6 @@ jobs:
         i2c-dev
         spidev
         rtc-ds1307
-        vc4
-        v3d
         MODULES
         
         # Create modprobe configuration for brcmfmac
@@ -488,19 +487,15 @@ jobs:
         iface lo inet loopback
         
         # Ethernet - managed by dhcpcd
-        auto eth0
+        allow-hotplug eth0
         iface eth0 inet manual
         
         # Wireless - managed by dhcpcd after wpa_supplicant connects
-        auto wlan0
+        allow-hotplug wlan0
         iface wlan0 inet manual
         
-        auto uap0
-        iface uap0 inet static
-            address 192.168.11.106
-            netmask 255.255.255.0
-            wpa-driver nl80211
-            wpa-conf /etc/wpa_supplicant_uap0.conf
+        allow-hotplug uap0
+        iface uap0 inet manual
         EOF
         
         # Create wpa_supplicant_uap0 configuration
@@ -511,14 +506,14 @@ jobs:
         update_config=1
         fast_reauth=1
         country=UA
-        ap_scan=2
+        #ap_scan=2
         network={
             ssid="CFPP-100AC"
             mode=2
             frequency=2442
             key_mgmt=WPA-PSK
-            proto=RSN
-            pairwise=CCMP
+            #proto=RSN
+            #pairwise=CCMP
             psk="12345678"
         }
         
