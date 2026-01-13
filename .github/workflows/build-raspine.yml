@@ -496,6 +496,7 @@ jobs:
         
         allow-hotplug uap0
         iface uap0 inet manual
+            hwaddress ether 00:11:22:33:44:55
         EOF
         
         # Create wpa_supplicant_uap0 configuration
