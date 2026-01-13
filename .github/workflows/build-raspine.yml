@@ -306,11 +306,6 @@ jobs:
         addgroup cfpp-100ac wheel
         addgroup cfpp-100ac video
         addgroup cfpp-100ac input
-        addgroup cfpp-100ac i2c
-        addgroup cfpp-100ac spi
-        addgroup cfpp-100ac gpio
-        addgroup cfpp-100ac sudo
-        addgroup cfpp-100ac dialout
         echo "cfpp-100ac:12345678" | chpasswd
         
         # Configure sudo for wheel group (passwordless)
