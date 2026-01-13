@@ -244,17 +244,12 @@ jobs:
           sudo \
           tzdata \
           dhcpcd \
-          dbus \
           nano \
           htop \
-          python3-dev \
+          python3 \
           py3-smbus \
           py3-rpigpio \
-          i2c-tools \
-          py3-pip \
-          py3-zstandard \
-          patchelf \
-          clang
+          i2c-tools
         
         # Install Raspberry Pi kernels from RasPINE repo
         # Using --force-overwrite to handle overlay conflicts between packages
@@ -293,7 +288,6 @@ jobs:
         rc-update add crond default
         rc-update add wpa_supplicant boot
         rc-update add dhcpcd boot
-        rc-update add dbus boot
         rc-update add hwclock boot
         
         # Configure hostname
@@ -310,6 +304,14 @@ jobs:
         echo "Creating cfpp-100ac user..."
         adduser -D -s /bin/sh cfpp-100ac
         addgroup cfpp-100ac wheel
+        addgroup cfpp-100ac video
+        addgroup cfpp-100ac input
+        addgroup cfpp-100ac seat
+        addgroup cfpp-100ac i2c
+        addgroup cfpp-100ac spi
+        addgroup cfpp-100ac gpio
+        addgroup cfpp-100ac sudo
+        addgroup cfpp-100ac dialout
         echo "cfpp-100ac:12345678" | chpasswd
         
         # Configure sudo for wheel group (passwordless)
@@ -317,6 +319,7 @@ jobs:
         
         # Disable root password login (can still sudo)
         #passwd -l root
+        echo "root:12345678" | chpasswd
         
         # Configure SSH - key only by default
         mkdir -p /etc/conf.d
@@ -332,6 +335,17 @@ jobs:
         mkdir -p /boot/firmware
         mkdir -p /var/log
         mkdir -p /usr/local/bin
+        mkdir -p /run/user
+        mkdir -p /boot/firmware/cfpp-100ac
+        
+        # Create autostart sh file
+        cat > /boot/firmware/cfpp-100ac/startup.sh << ASF
+        #!/bin/sh
+        # restart networking
+        rc-service networking restart
+        # start firmware
+        /usr/bin/python3 /boot/firmware/cfpp-100ac/main.py
+        ASF
         
         echo -e  "@reboot sleep 5; sh /boot/firmware/cfpp-100ac/startup.sh" | sudo crontab -u root -
         
@@ -350,6 +364,8 @@ jobs:
         i2c-dev
         spidev
         rtc-ds1307
+        vc4
+        v3d
         MODULES
         
         # Create modprobe configuration for brcmfmac
