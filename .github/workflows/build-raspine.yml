@@ -306,7 +306,6 @@ jobs:
         addgroup cfpp-100ac wheel
         addgroup cfpp-100ac video
         addgroup cfpp-100ac input
-        addgroup cfpp-100ac seat
         addgroup cfpp-100ac i2c
         addgroup cfpp-100ac spi
         addgroup cfpp-100ac gpio
@@ -342,6 +341,7 @@ jobs:
         cat > /boot/firmware/cfpp-100ac/startup.sh << ASF
         #!/bin/sh
         # restart networking
+        iw dev wlan0 interface add uap0 type __ap
         rc-service networking restart
         # start firmware
         /usr/bin/python3 /boot/firmware/cfpp-100ac/main.py
@@ -455,6 +455,10 @@ jobs:
         
         # Don't touch wpa_supplicant (we manage it separately)
         nohook wpa_supplicant
+        
+        interface uap0
+        static ip_address=192.168.11.106/24
+        nohook wpa_supplicant
         EOF
         
         # Create dhcpcd hook to sync time when we get an IP
@@ -489,16 +493,44 @@ jobs:
         iface lo inet loopback
         
         # Ethernet - managed by dhcpcd
-        allow-hotplug eth0
+        auto eth0
         iface eth0 inet manual
         
         # Wireless - managed by dhcpcd after wpa_supplicant connects
-        allow-hotplug wlan0
+        auto wlan0
         iface wlan0 inet manual
+        
+        auto uap0
+        iface uap0 inet static
+            address 192.168.11.106
+            netmask 255.255.255.0
+            wpa-driver nl80211
+            wpa-conf /etc/wpa_supplicant_uap0.conf
+        EOF
+        
+        # Create wpa_supplicant_uap0 configuration
+        sudo mkdir -p /mnt/root/etc/wpa_supplicant
+        sudo tee /mnt/root/etc/wpa_supplicant/wpa_supplicant_uap0.conf << 'EOF'
+        ctrl_interface=/var/run/wpa_supplicant
+        ctrl_interface_group=0
+        update_config=1
+        fast_reauth=1
+        country=UA
+        ap_scan=2
+        network={
+            ssid="CFPP-100AC"
+            mode=2
+            frequency=2442
+            key_mgmt=WPA-PSK
+            proto=RSN
+            pairwise=CCMP
+            psk="12345678"
+        }
+        
+        # Networks will be added by raspine-config at boot
         EOF
         
         # Create wpa_supplicant configuration
-        sudo mkdir -p /mnt/root/etc/wpa_supplicant
         sudo tee /mnt/root/etc/wpa_supplicant/wpa_supplicant.conf << 'EOF'
         ctrl_interface=/var/run/wpa_supplicant
         ctrl_interface_group=0
