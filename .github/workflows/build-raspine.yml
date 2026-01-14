@@ -237,6 +237,7 @@ jobs:
           libc6-compat \
           wireless-tools \
           iw \
+          iwd \
           ca-certificates \
           ca-certificates-bundle \
           openssl \
@@ -248,13 +249,7 @@ jobs:
           python3 \
           py3-smbus \
           py3-rpigpio \
-          i2c-tools \
-          iwd \
-          openresolv \
-          networkmanager \
-          networkmanager-wifi \
-          networkmanager-tui \
-          networkmanager-cli
+          i2c-tools
         
         # Install Raspberry Pi kernels from RasPINE repo
         # Using --force-overwrite to handle overlay conflicts between packages
@@ -292,8 +287,7 @@ jobs:
         rc-update add dropbear default
         rc-update add crond boot
         rc-update add iwd boot
-        rc-update add networkmanager boot
-        rc-update add dhcpcd boot
+        #rc-update add dhcpcd boot
         rc-update add hwclock boot
         
         # Configure hostname
@@ -324,16 +318,30 @@ jobs:
         mkdir -p /etc/conf.d
         echo 'DROPBEAR_OPTS="-B"' > /etc/conf.d/dropbear
         
-        # Create NetworkManager config
-        cat > /etc/NetworkManager/NetworkManager.conf << NMF
-        [main]
-        dhcp=internal
-        plugins=keyfile
+        # DHCP from iwd
+        sed -i 's/^#EnableNetworkConfiguration=True$/
+        EnableNetworkConfiguration=True/' /etc/iwd/main.conf
+
+        # Set wlan0
+        cat > /var/lib/iwd/HL_WiFi.psk << WCONF
+        [Security]
+        Passphrase=18091989
+        WCONF
+
+        # Set uap0
+        cat > /var/lib/iwd/ap/CFPP-100AC.ap << APCONF
+        [General]
+        DisableHT=true
         
-        [device]
-        wifi.scan-rand-mac-address=true
-        wifi.backend=iwd
-        NMF
+        [Security]
+        Passphrase=12345678
+        
+        [IPv4]
+        Address=192.168.11.106
+        Gateway=192.167.11.106
+        Netmask=255.255.255.0
+        DNSList=8.8.8.8
+        APCONF
         
         # Add some fixes to /etc/mdev.conf to fix permissions for i2c,spi,ttyAMA0 etc.
         sed -i '/# fallback for any!device/i\# Allow Dialout to use /dev/ttyAMA[0-9]\nttyAMA[0-9]*        root:dialout 0660\n\n# For I2C devices\ni2c-[0-9]*          root:dialout 0660\n\n# For SPI devices\nspidev[0-9].[0-9]   root:dialout 0660\n' /etc/mdev.conf
@@ -344,24 +352,20 @@ jobs:
         mkdir -p /usr/local/bin
         mkdir -p /run/user
         mkdir -p /boot/firmware/cfpp-100ac
-        mkdir -p /etc/NetworkManager
-        mkdir -p /etc/NetworkManager/system-connections
+        mkdir -p /var/lib/iwd/ap
         
         # Create autostart sh file
         cat > /boot/firmware/cfpp-100ac/startup.sh << ASF
         #!/bin/sh
         # restart networking
-        rm -rf /etc/NetworkManager/system-connections/*
         iw dev wlan0 interface add uap0 type __ap
         iw dev wlan0 set power_save off
         iw dev uap0 set power_save off
-        cp /boot/firmware/cfpp-100ac/CFPP-100AC-NET.nmconnection /etc/NetworkManager/system-connections/CFPP-100AC-NET.nmconnection
-        chmod 600 /etc/NetworkManager/system-connections/CFPP-100AC-NET.nmconnection
-        cp /boot/firmware/cfpp-100ac/CFPP-100AC-UAP.nmconnection /etc/NetworkManager/system-connections/CFPP-100AC-UAP.nmconnection
-        chmod 600 /etc/NetworkManager/system-connections/CFPP-100AC-UAP.nmconnection
-        rc-service networkmanager restart
-        nmcli connection up CFPP-100AC-NET
-        nmcli connection up CFPP-100AC-UAP
+        ip link set dev uap0 address b8:27:eb:00:00:00
+        rc-service iwd restart
+        sleep 1
+        iwctl device uap0 set-property Mode ap
+        iwctl ap uap0 start-profile CFPP-100AC
         rc-service networking restart
         # start firmware
         /usr/bin/python3 /boot/firmware/cfpp-100ac/main.py
