@@ -244,6 +244,7 @@ jobs:
           sudo \
           tzdata \
           dhcpcd \
+          dnsmasq \
           nano \
           htop \
           python3 \
@@ -285,9 +286,10 @@ jobs:
         rc-update add bootmisc boot
         rc-update add syslog boot
         rc-update add dropbear default
-        rc-update add crond default
+        rc-update add crond boot
         rc-update add wpa_supplicant boot
         rc-update add dhcpcd boot
+        rc-update add dnsmasq boot
         rc-update add hwclock boot
         
         # Configure hostname
@@ -312,7 +314,6 @@ jobs:
         echo "%wheel ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/wheel
         
         # Disable root password login (can still sudo)
-        #passwd -l root
         echo "root:12345678" | chpasswd
         
         # Configure SSH - key only by default
@@ -336,7 +337,7 @@ jobs:
         cat > /boot/firmware/cfpp-100ac/startup.sh << ASF
         #!/bin/sh
         # restart networking
-        iw dev wlan0 interface add uap0 type __ap addr 11:22:33:11:22:33
+        iw dev wlan0 interface add uap0 type __ap
         wpa_supplicant -iuap0 -c/etc/wpa_supplicant/wpa_supplicant_uap0.conf
         rc-service networking restart
         # start firmware
@@ -360,6 +361,8 @@ jobs:
         i2c-dev
         spidev
         rtc-ds1307
+        vc4
+        v3d
         MODULES
         
         # Create modprobe configuration for brcmfmac
@@ -481,6 +484,16 @@ jobs:
         EOF
         sudo chmod +x /mnt/root/usr/lib/dhcpcd/dhcpcd-hooks/30-time-sync
         
+        # AP DHCP configuration
+        sudo tee /mnt/root/etc/dnsmasq.conf << 'EOF'
+        interface=lo,uap0
+        bind-interfaces
+        bogus-priv
+        interface=uap0
+        dhcp-range=192.168.11.10,192.168.11.200,255.255.255.0,24h
+        dhcp-option=option:router,192.168.11.106
+        EOF
+        
         # Network interfaces configuration - minimal, dhcpcd handles DHCP
         sudo tee /mnt/root/etc/network/interfaces << 'EOF'
         auto lo
@@ -496,7 +509,6 @@ jobs:
         
         allow-hotplug uap0
         iface uap0 inet manual
-            hwaddress ether 00:11:22:33:44:55
         EOF
         
         # Create wpa_supplicant_uap0 configuration
@@ -505,16 +517,14 @@ jobs:
         ctrl_interface=/var/run/wpa_supplicant
         ctrl_interface_group=0
         update_config=1
-        fast_reauth=1
         country=UA
-        #ap_scan=2
         network={
             ssid="CFPP-100AC"
             mode=2
             frequency=2442
             key_mgmt=WPA-PSK
-            #proto=RSN
-            #pairwise=CCMP
+            proto=RSN
+            pairwise=CCMP
             psk="12345678"
         }
         
