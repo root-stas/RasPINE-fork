@@ -328,6 +328,7 @@ jobs:
         WCONF
 
         # Set uap0
+        mkdir -p /var/lib/iwd/ap
         cat > /var/lib/iwd/ap/CFPP-100AC.ap << APCONF
         [General]
         DisableHT=true
@@ -351,7 +352,6 @@ jobs:
         mkdir -p /usr/local/bin
         mkdir -p /run/user
         mkdir -p /boot/firmware/cfpp-100ac
-        mkdir -p /var/lib/iwd/ap
         
         # Create autostart sh file
         cat > /boot/firmware/cfpp-100ac/startup.sh << ASF
