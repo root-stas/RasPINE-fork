@@ -235,7 +235,6 @@ jobs:
           e2fsprogs \
           dropbear \
           libc6-compat \
-          wpa_supplicant \
           wireless-tools \
           iw \
           ca-certificates \
@@ -244,7 +243,6 @@ jobs:
           sudo \
           tzdata \
           dhcpcd \
-          dnsmasq \
           nano \
           htop \
           python3 \
@@ -253,7 +251,10 @@ jobs:
           i2c-tools \
           iwd \
           openresolv \
-          hostapd
+          networkmanager \
+          networkmanager-wifi \
+          networkmanager-tui \
+          networkmanager-cli
         
         # Install Raspberry Pi kernels from RasPINE repo
         # Using --force-overwrite to handle overlay conflicts between packages
@@ -290,7 +291,8 @@ jobs:
         rc-update add syslog boot
         rc-update add dropbear default
         rc-update add crond boot
-        rc-update add wpa_supplicant boot
+        rc-update add iwd boot
+        rc-update add networkmanager boot
         rc-update add dhcpcd boot
         rc-update add hwclock boot
         
@@ -322,9 +324,17 @@ jobs:
         mkdir -p /etc/conf.d
         echo 'DROPBEAR_OPTS="-B"' > /etc/conf.d/dropbear
         
-        # Configure wpa_supplicant service to not fail if no config
-        echo 'wpa_supplicant_args="-q"' > /etc/conf.d/wpa_supplicant
-
+        # Create NetworkManager config
+        cat > /etc/NetworkManager/NetworkManager.conf << NMF
+        [main]
+        dhcp=internal
+        plugins=keyfile
+        
+        [device]
+        wifi.scan-rand-mac-address=true
+        wifi.backend=iwd
+        NMF
+        
         # Add some fixes to /etc/mdev.conf to fix permissions for i2c,spi,ttyAMA0 etc.
         sed -i '/# fallback for any!device/i\# Allow Dialout to use /dev/ttyAMA[0-9]\nttyAMA[0-9]*        root:dialout 0660\n\n# For I2C devices\ni2c-[0-9]*          root:dialout 0660\n\n# For SPI devices\nspidev[0-9].[0-9]   root:dialout 0660\n' /etc/mdev.conf
         
@@ -334,13 +344,24 @@ jobs:
         mkdir -p /usr/local/bin
         mkdir -p /run/user
         mkdir -p /boot/firmware/cfpp-100ac
+        mkdir -p /etc/NetworkManager
+        mkdir -p /etc/NetworkManager/system-connections
         
         # Create autostart sh file
         cat > /boot/firmware/cfpp-100ac/startup.sh << ASF
         #!/bin/sh
         # restart networking
+        rm -rf /etc/NetworkManager/system-connections/*
         iw dev wlan0 interface add uap0 type __ap
-        wpa_supplicant -iuap0 -c/etc/wpa_supplicant/wpa_supplicant_uap0.conf -B
+        iw dev wlan0 set power_save off
+        iw dev uap0 set power_save off
+        cp /boot/firmware/cfpp-100ac/CFPP-100AC-NET.nmconnection /etc/NetworkManager/system-connections/CFPP-100AC-NET.nmconnection
+        chmod 600 /etc/NetworkManager/system-connections/CFPP-100AC-NET.nmconnection
+        cp /boot/firmware/cfpp-100ac/CFPP-100AC-UAP.nmconnection /etc/NetworkManager/system-connections/CFPP-100AC-UAP.nmconnection
+        chmod 600 /etc/NetworkManager/system-connections/CFPP-100AC-UAP.nmconnection
+        rc-service networkmanager restart
+        nmcli connection up CFPP-100AC-NET
+        nmcli connection up CFPP-100AC-UAP
         rc-service networking restart
         # start firmware
         /usr/bin/python3 /boot/firmware/cfpp-100ac/main.py
@@ -482,64 +503,10 @@ jobs:
         EOF
         sudo chmod +x /mnt/root/usr/lib/dhcpcd/dhcpcd-hooks/30-time-sync
         
-        # AP DHCP configuration
-        sudo tee /mnt/root/etc/dnsmasq.conf << 'EOF'
-        interface=lo,uap0
-        bind-interfaces
-        bogus-priv
-        interface=uap0
-        dhcp-range=192.168.11.10,192.168.11.200,255.255.255.0,24h
-        dhcp-option=option:router,192.168.11.106
-        EOF
-        
         # Network interfaces configuration - minimal, dhcpcd handles DHCP
         sudo tee /mnt/root/etc/network/interfaces << 'EOF'
         auto lo
         iface lo inet loopback
-        
-        # Ethernet - managed by dhcpcd
-        allow-hotplug eth0
-        iface eth0 inet manual
-        
-        # Wireless - managed by dhcpcd after wpa_supplicant connects
-        allow-hotplug wlan0
-        iface wlan0 inet manual
-        
-        auto uap0
-        iface uap0 inet static
-        address 192.168.11.106
-        netmask 255.255.255.0
-        gateway 192.168.11.106
-        EOF
-        
-        # Create wpa_supplicant_uap0 configuration
-        sudo mkdir -p /mnt/root/etc/wpa_supplicant
-        sudo tee /mnt/root/etc/wpa_supplicant/wpa_supplicant_uap0.conf << 'EOF'
-        ctrl_interface=/var/run/wpa_supplicant
-        ctrl_interface_group=0
-        update_config=1
-        country=UA
-        network={
-            ssid="CFPP-100AC"
-            mode=2
-            frequency=2442
-            key_mgmt=WPA-PSK
-            proto=RSN
-            pairwise=CCMP
-            psk="12345678"
-        }
-        
-        # Networks will be added by raspine-config at boot
-        EOF
-        
-        # Create wpa_supplicant configuration
-        sudo tee /mnt/root/etc/wpa_supplicant/wpa_supplicant.conf << 'EOF'
-        ctrl_interface=/var/run/wpa_supplicant
-        ctrl_interface_group=0
-        update_config=1
-        country=UA
-        
-        # Networks will be added by raspine-config at boot
         EOF
         
         echo "✓ Networking configured with dhcpcd and time sync"
@@ -589,245 +556,6 @@ jobs:
     - name: Create boot configuration system
       run: |
         # Create the configuration processor script
-        sudo tee /mnt/root/usr/local/bin/raspine-config << 'EOF'
-        #!/bin/sh
-        # RasPINE Boot Configuration Processor
-        
-        CONFIG_FILE="/boot/firmware/raspine-config.txt"
-        PROCESSED_FLAG="/etc/raspine-configured"
-        LOG_FILE="/var/log/raspine-config.log"
-        
-        log() {
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a $LOG_FILE
-        }
-        
-        # Check if config file exists
-        if [ ! -f "$CONFIG_FILE" ]; then
-            exit 0
-        fi
-        
-        # Check if already processed
-        if [ -f "$PROCESSED_FLAG" ]; then
-            log "Configuration already processed, skipping"
-            exit 0
-        fi
-        
-        log "Processing RasPINE configuration..."
-        
-        # Parse configuration file
-        while IFS='=' read -r key value; do
-            # Skip comments and empty lines
-            case "$key" in
-                "#"*|"") continue ;;
-            esac
-            
-            # Remove leading/trailing whitespace
-            key=$(echo "$key" | tr -d ' ')
-            value=$(echo "$value" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-            
-            case "$key" in
-                # WiFi configuration
-                wifi_ssid*)
-                    priority=$(echo "$key" | sed 's/wifi_ssid_*//')
-                    [ -z "$priority" ] && priority=1
-                    
-                    # Store SSID for processing
-                    eval "WIFI_SSID_${priority}=\"$value\""
-                    log "Found WiFi network: $value (priority $priority)"
-                    ;;
-                    
-                wifi_password*)
-                    priority=$(echo "$key" | sed 's/wifi_password_*//')
-                    [ -z "$priority" ] && priority=1
-                    
-                    # Store password for processing
-                    eval "WIFI_PASS_${priority}=\"$value\""
-                    ;;
-                    
-                wifi_country)
-                    log "Setting WiFi country: $value"
-                    echo "country=$value" >> /etc/wpa_supplicant/wpa_supplicant.conf
-                    ;;
-                    
-                enable_open_networks)
-                    if [ "$value" = "true" ]; then
-                        log "Enabling open network connections"
-                        echo "# Open networks enabled" >> /etc/wpa_supplicant/wpa_supplicant.conf
-                    fi
-                    ;;
-                    
-                # User configuration
-                user_password)
-                    log "Setting cfpp-100ac user password"
-                    # Create cfpp-100ac user if it doesn't exist
-                    if ! id cfpp-100ac >/dev/null 2>&1; then
-                        adduser -D -s /bin/sh cfpp-100ac
-                        addgroup cfpp-100ac wheel
-                    fi
-                    echo "cfpp-100ac:$value" | chpasswd
-                    ;;
-                    
-                enable_ssh_password)
-                    if [ "$value" = "true" ]; then
-                        log "Enabling SSH password authentication"
-                        # Dropbear: remove -s (disable password) and -g (disable password for root)
-                        sed -i 's/DROPBEAR_OPTS=.*/DROPBEAR_OPTS="-B"/' /etc/conf.d/dropbear
-                    else
-                        log "SSH key-only authentication enabled"
-                        sed -i 's/DROPBEAR_OPTS=.*/DROPBEAR_OPTS="-B -s"/' /etc/conf.d/dropbear
-                    fi
-                    ;;
-                    
-                ssh_key)
-                    log "Adding SSH public key"
-                    # Create cfpp-100ac user if needed
-                    if ! id cfpp-100ac >/dev/null 2>&1; then
-                        adduser -D -s /bin/sh cfpp-100ac
-                        addgroup cfpp-100ac wheel
-                    fi
-                    
-                    # Add SSH key
-                    mkdir -p /home/cfpp-100ac/.ssh
-                    echo "$value" >> /home/cfpp-100ac/.ssh/authorized_keys
-                    chmod 700 /home/cfpp-100ac/.ssh
-                    chmod 600 /home/cfpp-100ac/.ssh/authorized_keys
-                    chown -R cfpp-100ac:cfpp-100ac /home/cfpp-100ac/.ssh
-                    ;;
-                    
-                # System configuration
-                hostname)
-                    log "Setting hostname: $value"
-                    echo "$value" > /etc/hostname
-                    hostname "$value"
-                    ;;
-                    
-                timezone)
-                    log "Setting timezone: $value"
-                    # Alpine uses different timezone setup
-                    if [ -f "/usr/share/zoneinfo/$value" ]; then
-                        cp "/usr/share/zoneinfo/$value" /etc/localtime
-                        echo "$value" > /etc/timezone
-                    fi
-                    ;;
-                    
-                locale)
-                    log "Setting locale: $value"
-                    # Note: Alpine has limited locale support
-                    echo "export LANG=$value" >> /etc/profile.d/locale.sh
-                    ;;
-            esac
-        done < "$CONFIG_FILE"
-        
-        # Process WiFi networks (add them in priority order)
-        log "Configuring WiFi networks..."
-        for i in 10 9 8 7 6 5 4 3 2 1; do
-            eval "ssid=\$WIFI_SSID_${i}"
-            eval "pass=\$WIFI_PASS_${i}"
-            
-            if [ -n "$ssid" ] && [ -n "$pass" ]; then
-                log "Adding network: $ssid (priority $i)"
-                wpa_passphrase "$ssid" "$pass" | sed "s/}/\tpriority=$i\n}/" >> /etc/wpa_supplicant/wpa_supplicant.conf
-            fi
-        done
-        
-        # Don't restart services - they haven't started yet!
-        # The services will start after this script completes
-        if [ -n "$WIFI_SSID_1" ]; then
-            log "WiFi networks configured - will connect on service start"
-        fi
-        
-        # Mark as configured
-        date > "$PROCESSED_FLAG"
-        
-        # DELETE the config file for security (it contains passwords!)
-        rm -f "$CONFIG_FILE"
-        log "Configuration complete! Config file securely deleted."
-        
-        # Don't restart SSH here either - let it start normally
-        log "Services will start after configuration completes"
-        
-        EOF
-        sudo chmod +x /mnt/root/usr/local/bin/raspine-config
-        
-        # Create OpenRC service for boot configuration
-        sudo tee /mnt/root/etc/init.d/raspine-config << 'EOF'
-        #!/sbin/openrc-run
-        
-        description="RasPINE Boot Configuration"
-        
-        # Set a short timeout since this is a quick operation
-        rc_timeout=5
-        
-        depend() {
-            need localmount
-            after modules
-            before networking wpa_supplicant
-            provide raspine-config
-        }
-        
-        start() {
-            ebegin "Processing RasPINE configuration"
-            /usr/local/bin/raspine-config
-            eend $?
-        }
-        EOF
-        sudo chmod +x /mnt/root/etc/init.d/raspine-config
-        
-        # Add service to boot
-        sudo ln -s /etc/init.d/raspine-config /mnt/root/etc/runlevels/boot/raspine-config
-        
-        # Create sample configuration file for the boot partition
-        sudo tee /mnt/boot/raspine-config.txt << 'EOF'
-        # RasPINE Boot Configuration
-        # Copy this file to the boot partition as 'raspine-config.txt'
-        # Remove the # from lines you want to use
-        # WARNING: This file will be DELETED after processing for security!
-        
-        # === WIFI CONFIGURATION ===
-        # Primary network (highest priority)
-        wifi_ssid=KaNodNet-2G
-        wifi_password=0445605879
-        
-        # Secondary networks (numbered for priority - higher numbers = higher priority)
-        #wifi_ssid_2=YourHomeNetwork
-        #wifi_password_2=YourHomePassword
-        
-        #wifi_ssid_3=YourMobileHotspot  
-        #wifi_password_3=YourHotspotPassword
-        
-        # Additional networks (add as many as needed)
-        #wifi_ssid_4=CoffeeShopWiFi
-        #wifi_password_4=CoffeeShopPassword
-        
-        # WiFi country code (affects available channels and power limits)
-        wifi_country=UA
-        
-        # Allow connection to open networks (no password) - use with caution!
-        enable_open_networks=false
-        
-        # === USER SECURITY ===
-        # Set password for cfpp-100ac user (required for SSH password auth)
-        user_password=12345678
-        
-        # Enable SSH password authentication (default: key-only)
-        enable_ssh_password=true
-        
-        # Add SSH public key for secure access (recommended)
-        #ssh_key=ssh-rsa AAAAB3NzaC1yc2EAAAA... your-email@example.com
-        
-        # === SYSTEM CONFIGURATION ===
-        hostname=cfpp-100ac
-        timezone=Europe/Kyiv
-        locale=en_US.UTF-8
-        
-        # === SECURITY NOTES ===
-        # • Root account is disabled by default (secure)
-        # • cfpp-100ac user has passwordless sudo access
-        # • SSH password authentication is disabled unless explicitly enabled
-        # • THIS FILE WILL BE DELETED after processing for security
-        # • WiFi networks are tried in order of priority (higher numbers first)
-        EOF
-        
         echo "✓ Boot configuration system created"
 
     - name: Create system information file
