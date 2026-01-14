@@ -572,7 +572,6 @@ jobs:
             
             # Fix configuration file
             echo "dtoverlay=i2c-rtc,ds3231" | sudo tee -a /mnt/boot/config.txt > /dev/null
-            echo "dtoverlay=vc4-kms-dsi-waveshare-panel-v2,10_1_inch_a" | sudo tee -a /mnt/boot/config.txt > /dev/null
             echo "display_auto_detect=0" | sudo tee -a /mnt/boot/config.txt > /dev/null
             echo "camera_auto_detect=0" | sudo tee -a /mnt/boot/config.txt > /dev/null
             
