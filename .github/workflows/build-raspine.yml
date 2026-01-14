@@ -250,7 +250,10 @@ jobs:
           python3 \
           py3-smbus \
           py3-rpigpio \
-          i2c-tools
+          i2c-tools \
+          iwd \
+          openresolv \
+          hostapd
         
         # Install Raspberry Pi kernels from RasPINE repo
         # Using --force-overwrite to handle overlay conflicts between packages
@@ -289,7 +292,6 @@ jobs:
         rc-update add crond boot
         rc-update add wpa_supplicant boot
         rc-update add dhcpcd boot
-        rc-update add dnsmasq boot
         rc-update add hwclock boot
         
         # Configure hostname
@@ -452,10 +454,6 @@ jobs:
         
         # Don't touch wpa_supplicant (we manage it separately)
         nohook wpa_supplicant
-        
-        interface uap0
-        static ip_address=192.168.11.106/24
-        nohook wpa_supplicant
         EOF
         
         # Create dhcpcd hook to sync time when we get an IP
@@ -507,8 +505,11 @@ jobs:
         allow-hotplug wlan0
         iface wlan0 inet manual
         
-        allow-hotplug uap0
-        iface uap0 inet manual
+        auto uap0
+        iface uap0 inet static
+        address 192.168.11.106
+        netmask 255.255.255.0
+        gateway 192.168.11.106
         EOF
         
         # Create wpa_supplicant_uap0 configuration
