@@ -319,8 +319,7 @@ jobs:
         echo 'DROPBEAR_OPTS="-B"' > /etc/conf.d/dropbear
         
         # DHCP from iwd
-        sed -i 's/^#EnableNetworkConfiguration=True$/
-        EnableNetworkConfiguration=True/' /etc/iwd/main.conf
+        sed -i 's/^#EnableNetworkConfiguration=True$/EnableNetworkConfiguration=True/' /etc/iwd/main.conf
 
         # Set wlan0
         cat > /var/lib/iwd/HL_WiFi.psk << WCONF
