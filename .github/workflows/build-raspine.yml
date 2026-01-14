@@ -338,7 +338,7 @@ jobs:
         #!/bin/sh
         # restart networking
         iw dev wlan0 interface add uap0 type __ap
-        wpa_supplicant -iuap0 -c/etc/wpa_supplicant/wpa_supplicant_uap0.conf
+        wpa_supplicant -iuap0 -c/etc/wpa_supplicant/wpa_supplicant_uap0.conf -B
         rc-service networking restart
         # start firmware
         /usr/bin/python3 /boot/firmware/cfpp-100ac/main.py
