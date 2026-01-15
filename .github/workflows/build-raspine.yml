@@ -388,6 +388,8 @@ jobs:
             unzip -o "$fw" -d /boot/firmware/cfpp-100ac/
             rm -f "$fw"
             rm -f "$file"
+            reboot &
+            exit 0
         fi
         
         rm -r -f /var/lib/iwd/*.psk
