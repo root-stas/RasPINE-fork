@@ -331,8 +331,8 @@ jobs:
         
         [Scan]
         DisablePeriodicScan=true
-        IWDCONF        
-
+        IWDCONF
+        
         # Set wlan0
         cat > /boot/firmware/cfpp-100ac/HL_WiFi.psk << WCONF
         [Security]
@@ -342,7 +342,7 @@ jobs:
         [IPv4]
         SendHostname=true
         WCONF
-
+        
         # Set uap0
         mkdir -p /var/lib/iwd/ap
         cat > /boot/firmware/cfpp-100ac/CFPP-100AC.ap << APCONF
@@ -426,6 +426,8 @@ jobs:
         # start firmware
         /usr/bin/python3 /boot/firmware/cfpp-100ac/main.py
         ASF
+
+        ls /boot/firmware/cfpp-100ac
         
         echo -e  "@reboot sleep 5; sh /boot/firmware/cfpp-100ac/startup.sh" | sudo crontab -u root -
         
