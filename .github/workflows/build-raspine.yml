@@ -413,14 +413,10 @@ jobs:
         if [ -e "$file" ]; then
             json="$(cat $file)"
             if [ $(echo $json | grep -o '"wf-mode": [^,]*' | grep -o '[^ ]*$') == "true" ]; then
-                iwctl ap ap0 start-profile CFPP-100AC
-            fi
-            if [ $(echo $json | grep -o '"wf-static": [^,]*' | grep -o '[^ ]*$') == "false" ]; then
                 iwctl station wlan0 connect "$ssid"
             fi
-        else
-            iwctl ap ap0 start-profile CFPP-100AC
         fi
+        iwctl ap ap0 start-profile CFPP-100AC
         
         sleep 1
         rc-service networking restart
