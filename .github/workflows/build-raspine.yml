@@ -406,16 +406,16 @@ jobs:
         iw dev wlan0 interface add ap0 type __ap
         ip link set dev ap0 address 12:34:56:78:ab:ce
         
-        rc-service iwd start
+        rc-service iwd restart
         sleep 1
         iwctl device ap0 set-property Mode ap
         
-        file=/boot/firmware/cfpp-100ac/config.json
         if [ -e "$file" ]; then
             json="$(cat $file)"
             if [ $(echo $json | grep -o '"wf-mode": [^,]*' | grep -o '[^ ]*$') == "true" ]; then
                 iwctl ap ap0 start-profile CFPP-100AC
-            else
+            fi
+            if [ $(echo $json | grep -o '"wf-static": [^,]*' | grep -o '[^ ]*$') == "false" ]; then
                 iwctl station wlan0 connect "$ssid"
             fi
         else
