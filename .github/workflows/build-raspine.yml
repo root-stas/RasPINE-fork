@@ -285,12 +285,13 @@ jobs:
         rc-update add sysctl boot
         rc-update add hostname boot
         rc-update add bootmisc boot
-        rc-update add syslog boot
-        rc-update add dropbear default
-        rc-update add crond boot
-        rc-update add iwd boot
-        rc-update add dhcpcd boot
         rc-update add hwclock boot
+        rc-update add syslog boot
+        rc-update add crond boot
+        rc-update add dhcpcd boot
+        rc-update add dbus boot
+        rc-update add iwd boot
+        rc-update add dropbear default
         
         # Configure hostname
         echo "cfpp-100ac" > /etc/hostname
@@ -328,9 +329,6 @@ jobs:
         
         [Network]
         EnableIPv6=false
-        
-        [Scan]
-        DisablePeriodicScan=true
         IWDCONF
         
         # Set wlan0
@@ -413,6 +411,8 @@ jobs:
         if [ -e "$file" ]; then
             json="$(cat $file)"
             if [ $(echo $json | grep -o '"wf-mode": [^,]*' | grep -o '[^ ]*$') == "true" ]; then
+                iwctl station wlan0 scan
+                sleep 1
                 iwctl station wlan0 connect "$ssid"
             fi
         fi
