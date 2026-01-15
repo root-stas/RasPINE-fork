@@ -237,6 +237,7 @@ jobs:
           libc6-compat \
           wireless-tools \
           iw \
+          dbus \
           iwd \
           ca-certificates \
           ca-certificates-bundle \
@@ -246,6 +247,7 @@ jobs:
           dhcpcd \
           nano \
           htop \
+          unzip \
           python3 \
           py3-smbus \
           py3-rpigpio \
@@ -286,7 +288,7 @@ jobs:
         rc-update add syslog boot
         rc-update add dropbear default
         rc-update add crond boot
-        rc-update add iwd boot
+        #rc-update add iwd boot
         #rc-update add dhcpcd boot
         rc-update add hwclock boot
         
@@ -318,18 +320,31 @@ jobs:
         mkdir -p /etc/conf.d
         echo 'DROPBEAR_OPTS="-B"' > /etc/conf.d/dropbear
         
-        # DHCP from iwd
-        sed -i 's/^#EnableNetworkConfiguration=True$/EnableNetworkConfiguration=True/' /etc/iwd/main.conf
+        # Set iwd cfg
+        cat > /boot/firmware/cfpp-100ac/main.conf << IWDCONF
+        [General]
+        EnableNetworkConfiguration=true
+        
+        [Network]
+        EnableIPv6=false
+        
+        [Scan]
+        DisablePeriodicScan=true
+        IWDCONF        
 
         # Set wlan0
-        cat > /var/lib/iwd/HL_WiFi.psk << WCONF
+        cat > /boot/firmware/cfpp-100ac/HL_WiFi.psk << WCONF
         [Security]
         Passphrase=18091989
+        [Settings]
+        AutoConnect=false
+        [IPv4]
+        SendHostname=true
         WCONF
 
         # Set uap0
         mkdir -p /var/lib/iwd/ap
-        cat > /var/lib/iwd/ap/CFPP-100AC.ap << APCONF
+        cat > /boot/firmware/cfpp-100ac/CFPP-100AC.ap << APCONF
         [General]
         DisableHT=true
         
@@ -357,15 +372,57 @@ jobs:
         cat > /boot/firmware/cfpp-100ac/startup.sh << ASF
         #!/bin/sh
         # restart networking
-        iw dev wlan0 interface add uap0 type __ap
-        iw dev wlan0 set power_save off
-        iw dev uap0 set power_save off
-        ip link set dev uap0 address b8:27:eb:00:00:00
-        rc-service iwd restart
+        
+        ssid=HL_WiFi
+        file=/boot/firmware/cfpp-100ac/config.json
+        fw=/boot/firmware/cfpp-100ac/update.zip
+        
+        rm -r -f /boot/firmware/cfpp-100ac/__*
+        rm -r -f /boot/firmware/cfpp-100ac/._*
+        rm -r -f /boot/firmware/cfpp-100ac/www/._*
+        rm -r -f /boot/firmware/cfpp-100ac/www/locale/._*
+        rm -r -f /boot/firmware/cfpp-100ac/www/fonts/._*
+        
+        if [ -e "$fw" ]; then
+            rm -r -f /boot/firmware/cfpp-100ac/www
+            unzip -o "$fw" -d /boot/firmware/cfpp-100ac/
+            rm -f "$fw"
+            rm -f "$file"
+        fi
+        
+        rm -r -f /var/lib/iwd/*.psk
+        rm -r -f /var/lib/iwd/ap/*.ap
+        
+        cp -f /boot/firmware/cfpp-100ac/"$ssid".psk /var/lib/iwd/"$ssid".psk
+        cp -f /boot/firmware/cfpp-100ac/CFPP-100AC.ap /var/lib/iwd/ap/CFPP-100AC.ap
+        cp -f /boot/firmware/cfpp-100ac/main.conf /etc/iwd/main.conf
+        chmod 600 /var/lib/iwd/"$ssid".psk
+        chmod 600 /var/lib/iwd/ap/CFPP-100AC.ap
+        chmod 600 /etc/iwd/main.conf
+        
+        #iw dev wlan0 set power_save off
+        iw dev wlan0 interface add ap0 type __ap
+        ip link set dev ap0 address 12:34:56:78:ab:ce
+        
+        rc-service iwd start
         sleep 1
-        iwctl device uap0 set-property Mode ap
-        iwctl ap uap0 start-profile CFPP-100AC
+        iwctl device ap0 set-property Mode ap
+        
+        file=/boot/firmware/cfpp-100ac/config.json
+        if [ -e "$file" ]; then
+            json="$(cat $file)"
+            if [ $(echo $json | grep -o '"wf-mode": [^,]*' | grep -o '[^ ]*$') == "true" ]; then
+                iwctl ap ap0 start-profile CFPP-100AC
+            else
+                iwctl station wlan0 connect "$ssid"
+            fi
+        else
+            iwctl ap ap0 start-profile CFPP-100AC
+        fi
+        
+        sleep 1
         rc-service networking restart
+        
         # start firmware
         /usr/bin/python3 /boot/firmware/cfpp-100ac/main.py
         ASF
@@ -403,7 +460,7 @@ jobs:
         # Set regulatory domain
         cat > /etc/modprobe.d/cfg80211.conf << REGCONF
         # Set regulatory domain
-        options cfg80211 ieee80211_regdom=UA
+        options cfg80211 ieee80211_regdom=US
         REGCONF
         
         # Fix rfkill configuration
