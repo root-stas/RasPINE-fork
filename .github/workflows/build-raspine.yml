@@ -321,6 +321,7 @@ jobs:
         echo 'DROPBEAR_OPTS="-B"' > /etc/conf.d/dropbear
         
         # Set iwd cfg
+        mkdir -p /boot/firmware/cfpp-100ac
         cat > /boot/firmware/cfpp-100ac/main.conf << IWDCONF
         [General]
         EnableNetworkConfiguration=true
@@ -366,7 +367,6 @@ jobs:
         mkdir -p /var/log
         mkdir -p /usr/local/bin
         mkdir -p /run/user
-        mkdir -p /boot/firmware/cfpp-100ac
         
         # Create autostart sh file
         cat > /boot/firmware/cfpp-100ac/startup.sh << ASF
