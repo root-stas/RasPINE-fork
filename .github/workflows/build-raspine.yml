@@ -288,8 +288,8 @@ jobs:
         rc-update add syslog boot
         rc-update add dropbear default
         rc-update add crond boot
-        #rc-update add iwd boot
-        #rc-update add dhcpcd boot
+        rc-update add iwd boot
+        rc-update add dhcpcd boot
         rc-update add hwclock boot
         
         # Configure hostname
