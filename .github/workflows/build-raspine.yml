@@ -234,7 +234,7 @@ jobs:
           util-linux \
           e2fsprogs \
           dhcpcd \
-          resolvconf \
+          openresolv \
           dropbear \
           openssh-sftp-server \
           libc6-compat \
