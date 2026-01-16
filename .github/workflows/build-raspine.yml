@@ -244,7 +244,6 @@ jobs:
           openssl \
           sudo \
           tzdata \
-          dhcpcd \
           nano \
           htop \
           unzip \
@@ -276,6 +275,25 @@ jobs:
         echo "Updating CA certificates..."
         update-ca-certificates
         
+        # Add iw ap0
+        cat > /etc/init.d/iwap << IWD
+        #!/sbin/openrc-run
+        
+        description="Add AP wlan"
+        
+        depend() {
+         use logger network
+         after bootmisc modules
+         before dbus iwd
+        }
+        
+        start() {
+         iw dev wlan0 interface add ap0 type __ap
+         ip link set dev ap0 address b8:27:eb:00:00:00
+        }
+        IWD
+        chmod +x /etc/init.d/iwap
+        
         # Set up essential services
         echo "Configuring services..."
         rc-update add devfs sysinit
@@ -288,8 +306,8 @@ jobs:
         rc-update add hwclock boot
         rc-update add syslog boot
         rc-update add crond boot
-        rc-update add dhcpcd boot
-        rc-update add dbus boot
+        rc-update add networking boot
+        rc-update add iwap boot
         rc-update add iwd boot
         rc-update add dropbear default
         
@@ -329,14 +347,20 @@ jobs:
         
         [Network]
         EnableIPv6=false
+
+        [Scan]
+        DisablePeriodicScan=true
+        DisableRoamingScan=true
         IWDCONF
         
         # Set wlan0
         cat > /boot/firmware/cfpp-100ac/HL_WiFi.psk << WCONF
         [Security]
         Passphrase=18091989
+        
         [Settings]
-        AutoConnect=false
+        AutoConnect=true
+        
         [IPv4]
         SendHostname=true
         WCONF
@@ -344,9 +368,6 @@ jobs:
         # Set uap0
         mkdir -p /var/lib/iwd/ap
         cat > /boot/firmware/cfpp-100ac/CFPP-100AC.ap << APCONF
-        [General]
-        DisableHT=true
-        
         [Security]
         Passphrase=12345678
         
@@ -369,10 +390,9 @@ jobs:
         # Create autostart sh file
         cat > /boot/firmware/cfpp-100ac/startup.sh << ASF
         #!/bin/sh
-        # restart networking
+        # restart lo to localhost
+        rc-service networking restart
         
-        ssid=HL_WiFi
-        file=/boot/firmware/cfpp-100ac/config.json
         fw=/boot/firmware/cfpp-100ac/update.zip
         
         rm -r -f /boot/firmware/cfpp-100ac/__*
@@ -380,48 +400,29 @@ jobs:
         rm -r -f /boot/firmware/cfpp-100ac/www/._*
         rm -r -f /boot/firmware/cfpp-100ac/www/locale/._*
         rm -r -f /boot/firmware/cfpp-100ac/www/fonts/._*
+        rm -r -f /var/lib/iwd/*.psk
+        rm -r -f /var/lib/iwd/ap/*.ap
         
         if [ -e "$fw" ]; then
             rm -r -f /boot/firmware/cfpp-100ac/www
             unzip -o "$fw" -d /boot/firmware/cfpp-100ac/
+            cp -r -f /boot/firmware/cfpp-100ac/*.psk /var/lib/iwd/*.psk
             rm -f "$fw"
-            rm -f "$file"
+            rm -f /boot/firmware/cfpp-100ac/config.json
             reboot &
             exit 0
         fi
         
-        rm -r -f /var/lib/iwd/*.psk
-        rm -r -f /var/lib/iwd/ap/*.ap
-        
-        cp -f /boot/firmware/cfpp-100ac/"$ssid".psk /var/lib/iwd/"$ssid".psk
         cp -f /boot/firmware/cfpp-100ac/CFPP-100AC.ap /var/lib/iwd/ap/CFPP-100AC.ap
-        cp -f /boot/firmware/cfpp-100ac/main.conf /etc/iwd/main.conf
-        chmod 600 /var/lib/iwd/"$ssid".psk
-        chmod 600 /var/lib/iwd/ap/CFPP-100AC.ap
-        chmod 600 /etc/iwd/main.conf
-        
-        #iw dev wlan0 set power_save off
-        iw dev wlan0 interface add ap0 type __ap
-        ip link set dev ap0 address 12:34:56:78:ab:ce
-        
-        rc-service iwd restart
-        sleep 1
-        iwctl device ap0 set-property Mode ap
-        
-        if [ -e "$file" ]; then
-            json="$(cat $file)"
-            if [ $(echo $json | grep -o '"wf-mode": [^,]*' | grep -o '[^ ]*$') == "true" ]; then
-                iwctl station wlan0 scan
-                sleep 1
-                iwctl station wlan0 connect "$ssid"
-            fi
-        fi
         iwctl ap ap0 start-profile CFPP-100AC
+        #iwctl ap ap0 start CFPP-100AC 12345678
         
-        sleep 1
-        rc-service networking restart
+        #iwctl station wlan0 scan
+        #sleep 10
+        #iwctl --passphrase 0445605879 station wlan0 connect KaNodNet-2G
         
         # start firmware
+        sleep 2
         /usr/bin/python3 /boot/firmware/cfpp-100ac/main.py
         ASF
 
@@ -495,6 +496,16 @@ jobs:
     - name: Configure networking
       run: |
         # Create dhcpcd configuration
+        
+        # Network interfaces configuration - minimal, dhcpcd handles DHCP
+        sudo tee /mnt/root/etc/network/interfaces << 'EOF'
+        auto lo
+        iface lo inet loopback
+        EOF
+        
+        echo "✓ Networking configured"
+        exit 0
+        
         sudo tee /mnt/root/etc/dhcpcd.conf << 'EOF'
         # RasPINE dhcpcd configuration
         
