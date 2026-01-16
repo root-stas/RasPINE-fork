@@ -233,8 +233,6 @@ jobs:
           openrc \
           util-linux \
           e2fsprogs \
-          dhcpcd \
-          openresolv \
           dropbear \
           openssh-sftp-server \
           libc6-compat \
@@ -287,7 +285,7 @@ jobs:
         depend() {
          use logger network
          after bootmisc modules network
-         before dbus iwd
+         before iwd
         }
         
         start() {
@@ -309,7 +307,6 @@ jobs:
         rc-update add hwclock boot
         rc-update add syslog boot
         rc-update add crond boot
-        rc-update add dhcpcd boot
         rc-update add networking boot
         rc-update add iwap boot
         rc-update add iwd boot
@@ -321,7 +318,6 @@ jobs:
         # Configure hosts file
         cat > /etc/hosts << HOSTS
         127.0.0.1   cfpp-100ac localhost localhost.localdomain
-        127.0.1.1   cfpp-100ac localhost localhost.localdomain
         ::1   cfpp-100ac localhost localhost.localdomain
         HOSTS
         
@@ -346,29 +342,37 @@ jobs:
         echo 'net.ipv6.conf.all.disable_ipv6 = 1' >> /etc/sysctl.conf
         echo 'net.ipv6.conf.default.disable_ipv6 = 1' >> /etc/sysctl.conf
         echo 'net.ipv6.conf.lo.disable_ipv6 = 1' >> /etc/sysctl.conf
-        echo 'net.ipv6.conf.wlan0.disable_ipv6 = 1' >> /etc/sysctl.conf
-        echo 'net.ipv6.conf.ap0.disable_ipv6 = 1' >> /etc/sysctl.conf
-        echo 'net.ipv6.conf.eth0.disable_ipv6 = 1' >> /etc/sysctl.conf
-
-        resolvconf -u
         
         # Set iwd cfg
         cat > /etc/iwd/main.conf << IWDCONF
         [General]
+        
         EnableNetworkConfiguration=true
+        UseDefaultInterface=true
         
         [Network]
-        NameResolvingService=resolvconf
+        
         EnableIPv6=false
 
         [Scan]
+        
         DisablePeriodicScan=true
         DisableRoamingScan=true
+        
+        [Rank]
+        
+        BandModifier2_4GHz=1.0
+        BandModifier5GHz=0.0
+        BandModifier6GHz=0.0
         IWDCONF
         
         # Set uap0
         mkdir -p /var/lib/iwd/ap
         cat > /var/lib/iwd/ap/CFPP-100AC.ap << APCONF
+        [General]
+        DisableHT=true
+        Channel=11
+        
         [Security]
         Passphrase=12345678
         
@@ -376,7 +380,7 @@ jobs:
         Address=192.168.11.106
         Gateway=192.167.11.106
         Netmask=255.255.255.0
-        DNSList=8.8.8.8
+        IPRange=192.168.11.1,192.168.11.100
         APCONF
         
         # Add some fixes to /etc/mdev.conf to fix permissions for i2c,spi,ttyAMA0 etc.
@@ -413,11 +417,10 @@ jobs:
         fi
         
         iwctl ap ap0 start-profile CFPP-100AC
-        #iwctl ap ap0 start CFPP-100AC 12345678
         
-        #iwctl station wlan0 scan
-        #sleep 10
-        #iwctl --passphrase 0445605879 station wlan0 connect KaNodNet-2G
+        iwctl station wlan0 scan
+        sleep 10
+        iwctl --passphrase 0445605879 station wlan0 connect KaNodNet-2G
         
         # start firmware
         sleep 2
@@ -493,77 +496,16 @@ jobs:
 
     - name: Configure networking
       run: |
-        # Create dhcpcd configuration
-        
-        sudo tee /mnt/root/etc/dhcpcd.conf << 'EOF'
-        # RasPINE dhcpcd configuration
-        
-        # Inform the DHCP server of our hostname for DDNS
-        hostname
-        
-        # Use the hardware address of the interface for the Client ID
-        clientid
-        
-        # Persist interface configuration when dhcpcd exits
-        persistent
-        
-        # Rapid commit support
-        option rapid_commit
-        
-        # A list of options to request from the DHCP server
-        option domain_name_servers, domain_name, domain_search, host_name
-        option classless_static_routes
-        option interface_mtu
-        
-        # Respect the network MTU
-        option interface_mtu
-        
-        # A ServerID is required by RFC2131
-        require dhcp_server_identifier
-        
-        # Generate SLAAC address using the Hardware Address of the interface
-        slaac hwaddr
-        
-        # OR generate Stable Private IPv6 Addresses based on the DUID
-        #slaac private
-        
-        # Don't attempt to configure if carrier is not present
-        nocarrier
-        
-        # Wait for carrier before forking to background
-        waitip 4
-        
-        # Don't touch wpa_supplicant (we manage it separately)
-        nohook wpa_supplicant
+        # Create resolv configuration
+        sudo tee /mnt/root/etc/resolv.conf << 'EOF'
+        # RasPINE resolv configuration
+        nameserver 8.8.8.8
+        nameserver 8.8.4.4
+        nameserver 127.0.0.53
+        nameserver 127.0.0.1
         EOF
         
-        # Create dhcpcd hook to sync time when we get an IP
-        sudo mkdir -p /mnt/root/usr/lib/dhcpcd/dhcpcd-hooks
-        sudo tee /mnt/root/usr/lib/dhcpcd/dhcpcd-hooks/30-time-sync << 'EOF'
-        #!/bin/sh
-        # Sync time when network comes up
-        
-        case "$reason" in
-        BOUND|INFORM|REBIND|REBOOT)
-            # Only sync if time is clearly wrong (before year 2024)
-            if [ $(date +%Y) -lt 2024 ]; then
-                logger -t dhcpcd "Time appears wrong, syncing..."
-                # Try to sync time using busybox ntpd
-                ntpd -q -n -p pool.ntp.org 2>/dev/null || \
-                ntpd -q -n -p time.google.com 2>/dev/null || \
-                ntpd -q -n -p time.cloudflare.com 2>/dev/null || \
-                logger -t dhcpcd "Time sync failed - set manually with: date -s 'YYYY-MM-DD HH:MM:SS'"
-                
-                if [ $(date +%Y) -ge 2024 ]; then
-                    logger -t dhcpcd "Time sync successful: $(date)"
-                fi
-            fi
-            ;;
-        esac
-        EOF
-        sudo chmod +x /mnt/root/usr/lib/dhcpcd/dhcpcd-hooks/30-time-sync
-        
-        # Network interfaces configuration - minimal, dhcpcd handles DHCP
+        # Network interfaces configuration - minimal, other work over iwd
         sudo tee /mnt/root/etc/network/interfaces << 'EOF'
         auto lo
         iface lo inet loopback
@@ -602,6 +544,7 @@ jobs:
             echo "dtoverlay=i2c-rtc,ds3231" | sudo tee -a /mnt/boot/config.txt > /dev/null
             echo "display_auto_detect=0" | sudo tee -a /mnt/boot/config.txt > /dev/null
             echo "camera_auto_detect=0" | sudo tee -a /mnt/boot/config.txt > /dev/null
+            # ToDo add cfg80211.ieee80211_regdom=US and dsi display to cmdline.txt
             
             echo "Boot files copied from raspios-firmware package:"
             echo "  - config.txt: $(cat /mnt/boot/config.txt)"
