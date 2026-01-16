@@ -320,9 +320,9 @@ jobs:
         
         # Configure hosts file
         cat > /etc/hosts << HOSTS
-        127.0.0.1   cfpp-100ac cfpp-100ac.localdomain localhost localhost.localdomain
-        127.0.1.1   cfpp-100ac cfpp-100ac.localdomain localhost localhost.localdomain
-        ::1   cfpp-100ac cfpp-100ac.localdomain localhost localhost.localdomain
+        127.0.0.1   cfpp-100ac localhost localhost.localdomain
+        127.0.1.1   cfpp-100ac localhost localhost.localdomain
+        ::1   cfpp-100ac localhost localhost.localdomain
         HOSTS
         
         # Create cfpp-100ac user with sudo access
@@ -353,7 +353,7 @@ jobs:
         resolvconf -u
         
         # Set iwd cfg
-        cat > /etc/main.conf << IWDCONF
+        cat > /etc/iwd/main.conf << IWDCONF
         [General]
         EnableNetworkConfiguration=true
         
