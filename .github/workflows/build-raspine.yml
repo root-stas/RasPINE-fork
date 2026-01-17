@@ -225,7 +225,7 @@ jobs:
         # Update package index
         echo "Updating package index..."
         apk update
-        #apk add --no-cache alpine-conf
+        apk add --no-cache alpine-conf
 
         # This enables community repository
         setup-wayland-base
