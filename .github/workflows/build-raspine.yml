@@ -403,8 +403,8 @@ jobs:
         echo "exec_always chromium --kiosk --app=http://127.0.0.1/" | sudo tee -a /etc/sway/config > /dev/null
         
         # Create autostart sh file
-        mkdir -p /boot/cfpp-100ac
-        cat > /boot/cfpp-100ac/startup.sh << ASF
+        mkdir -p /boot/firmware/cfpp-100ac
+        cat > /boot/firmware/cfpp-100ac/startup.sh << ASF
         #!/bin/sh
         # restart lo to localhost
         rc-service networking restart
@@ -550,12 +550,8 @@ jobs:
         tmpfs           /var/log        tmpfs   defaults,noatime,nosuid,nodev,size=64M                    0    0
         EOF
         # Copy boot files from /boot to the actual boot partition
-        echo "/mnt/root/boot/firmware :"
-        ls /mnt/root/boot/firmware
         echo "/mnt/root/boot :"
-        ls /mnt/root/boot
-        echo "/mnt/boot :"
-        ls /mnt/boot
+        ls -R /mnt/root/boot
         echo "Copying boot files to boot partition..."
         if [ -d /mnt/root/boot ] && [ "$(ls -A /mnt/root/boot)" ]; then
             echo "Found boot files in /boot, copying to boot partition..."
