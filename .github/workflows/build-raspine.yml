@@ -29,8 +29,8 @@ on:
 env:
   ALPINE_VERSION: "${{ inputs.alpine_version }}"
   ALPINE_ARCH: "${{ inputs.alpine_arch }}"
-  IMAGE_SIZE: "1500M"
-  BOOT_SIZE: "256M"
+  IMAGE_SIZE: "1800M"
+  BOOT_SIZE: "512M"
 
 jobs:
   build:
@@ -225,6 +225,11 @@ jobs:
         # Update package index
         echo "Updating package index..."
         apk update
+        #apk add --no-cache alpine-conf
+
+        # This enables community repository
+        setup-wayland-base
+        echo "Base Wayland environment setup complete."
         
         # Install base packages plus WiFi support, sudo, and dhcpcd
         echo "Installing packages..."
@@ -249,9 +254,19 @@ jobs:
           htop \
           unzip \
           python3 \
-          py3-smbus \
           py3-rpigpio \
-          i2c-tools
+          i2c-tools \
+          mesa \
+          mesa-gl \
+          mesa-egl \
+          mesa-gles \
+          mesa-dri-gallium \
+          mesa-vulkan-broadcom \
+          wayland \
+          xwayland \
+          greetd \
+          sway \
+          chromium
         
         # Install Raspberry Pi kernels from RasPINE repo
         # Using --force-overwrite to handle overlay conflicts between packages
@@ -311,6 +326,7 @@ jobs:
         rc-update add iwap boot
         rc-update add iwd boot
         rc-update add dropbear default
+        rc-update add greetd default
         
         # Configure hostname
         echo "cfpp-100ac" > /etc/hostname
@@ -338,7 +354,7 @@ jobs:
         # Configure SSH - key only by default
         mkdir -p /etc/conf.d
         echo 'DROPBEAR_OPTS="-B"' > /etc/conf.d/dropbear
-
+        
         echo 'net.ipv6.conf.all.disable_ipv6 = 1' >> /etc/sysctl.conf
         echo 'net.ipv6.conf.default.disable_ipv6 = 1' >> /etc/sysctl.conf
         echo 'net.ipv6.conf.lo.disable_ipv6 = 1' >> /etc/sysctl.conf
@@ -391,6 +407,17 @@ jobs:
         mkdir -p /var/log
         mkdir -p /usr/local/bin
         mkdir -p /run/user
+        mkdir -p /etc/greetd
+        
+        cat > /etc/greetd/config.toml << GRET_EOF
+        [terminal]
+        vt = 1
+        [default_session]
+        command = "sway"
+        user = "cfpp-100ac"
+        GRET_EOF
+
+        echo "exec_always chromium --kiosk --app=http://127.0.0.1/" | sudo tee -a /etc/sway/config > /dev/null
         
         # Create autostart sh file
         mkdir -p /boot/firmware/cfpp-100ac
@@ -434,6 +461,23 @@ jobs:
         # Create home directory structure for cfpp-100ac
         mkdir -p /home/cfpp-100ac
         chown cfpp-100ac:cfpp-100ac /home/cfpp-100ac
+        
+        cat > /home/cfpp-100ac/.profile << PROF_EOF
+        export XDG_SESSION_TYPE=wayland
+        export XDG_SESSION_DESKTOP=sway
+        export XDG_CURRENT_DESKTOP=sway # Sway usually sets this
+        export MOZ_ENABLE_WAYLAND=1 # For Firefox, if used
+        export QT_QPA_PLATFORM=wayland # For Qt apps, if used
+        export ECORE_EVAS_ENGINE=wayland_shm # For EFL apps
+        export ELM_ACCEL=wayland
+        export SDL_VIDEODRIVER=wayland
+        export _JAVA_AWT_WM_NONREPARENTING=1
+        if [ -z "$XDG_RUNTIME_DIR" ]; then
+        	XDG_RUNTIME_DIR="/run/user/$(id -u)"
+        	mkdir -pm 0700 "$XDG_RUNTIME_DIR"
+        	export XDG_RUNTIME_DIR
+        fi
+        PROF_EOF
         
         # Add Broadcom WiFi modules to load at boot
         echo "Adding WiFi spi/i2c modules to auto-load..."
@@ -544,6 +588,7 @@ jobs:
             echo "dtoverlay=i2c-rtc,ds3231" | sudo tee -a /mnt/boot/config.txt > /dev/null
             echo "display_auto_detect=0" | sudo tee -a /mnt/boot/config.txt > /dev/null
             echo "camera_auto_detect=0" | sudo tee -a /mnt/boot/config.txt > /dev/null
+            echo "dtoverlay=vc4-kms-dsi-waveshare-panel-v2,10_1_inch_a" | sudo tee -a /mnt/boot/config.txt > /dev/null
             # ToDo add cfg80211.ieee80211_regdom=US and dsi display to cmdline.txt
             
             echo "Boot files copied from raspios-firmware package:"
