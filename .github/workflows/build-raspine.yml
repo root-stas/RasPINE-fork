@@ -558,7 +558,7 @@ jobs:
         
         # Create autostart sh file
         sudo mkdir -p /mnt/boot/cfpp-100ac
-        cat > sudo /mnt/boot/cfpp-100ac/startup.sh << ASF
+        sudo tee /mnt/boot/cfpp-100ac/startup.sh << 'EOF'
         #!/bin/sh
         # restart lo to localhost
         rc-service networking restart
@@ -589,7 +589,7 @@ jobs:
         # start firmware
         sleep 2
         /usr/bin/python3 /boot/firmware/cfpp-100ac/main.py
-        ASF
+        EOF
 
         echo "Boot files:"
         echo "/mnt/boot :"
