@@ -518,7 +518,7 @@ jobs:
         echo "Copying boot files to boot partition..."
         if [ -d /mnt/root/boot ]; then
             echo "Found boot files in /boot, copying to boot partition..."
-            sudo cp -a -d -f /mnt/root/boot/* /mnt/boot/
+            sudo cp -a -L /mnt/root/boot/* /mnt/boot/
             
             # Verify critical files exist
             if [ ! -f /mnt/boot/cmdline.txt ]; then
