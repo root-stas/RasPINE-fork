@@ -208,18 +208,11 @@ jobs:
           echo "nameserver 8.8.4.4" >> /etc/resolv.conf
         }
         
-        # Download and install RasPINE repository public key
-        echo "Adding RasPINE repository key..."
-        #wget -O /etc/apk/keys/raspine.rsa.pub https://raspine.pistar.uk/raspine.rsa.pub
-        wget -O /etc/apk/keys/raspine.rsa.pub https://root-stas.github.io/RasPINE-fork/raspine.rsa.pub
-        
         # Set up Alpine repositories including RasPINE repo
         echo "Setting up Alpine ${ALPINE_VERSION} repositories with RasPINE..."
         cat > /etc/apk/repositories << REPOS
         https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION}/main
         https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION}/community
-        #https://raspine.pistar.uk/v${ALPINE_VERSION}/community
-        https://root-stas.github.io/RasPINE-fork/v${ALPINE_VERSION}/community
         REPOS
         
         # Update package index
@@ -235,6 +228,7 @@ jobs:
         echo "Installing packages..."
         apk add --no-cache \
           alpine-base \
+          linux-rpi \
           openrc \
           util-linux \
           e2fsprogs \
@@ -267,21 +261,6 @@ jobs:
           greetd \
           sway \
           chromium
-        
-        # Install Raspberry Pi kernels from RasPINE repo
-        # Using --force-overwrite to handle overlay conflicts between packages
-        echo "Installing Raspberry Pi kernels from RasPINE repo... ${ALPINE_ARCH}"
-        if [ "${ALPINE_ARCH}" == "armhf" ]; then
-          apk add --no-cache --force-overwrite \
-          raspios-firmware \
-          raspios-kernel-v6 \
-          raspios-kernel-v7 \
-          raspios-kernel-v8
-        else
-          apk add --no-cache --force-overwrite \
-          raspios-firmware \
-          raspios-kernel-v8
-        fi
         
         # Fix the mkinitfs trigger error by creating the directory/file it expects
         mkdir -p /boot
@@ -413,10 +392,12 @@ jobs:
         [terminal]
         vt = 1
         [default_session]
-        command = "sway"
+        command = "/bin/sh /home/cfpp-100ac/sway_run.sh"
         user = "cfpp-100ac"
         GRET_EOF
 
+        echo "output DSI-2 transform 90" | sudo tee -a /etc/sway/config > /dev/null
+        echo "input 9271:1070:11-005d_Goodix_Capacitive_TouchScreen map_to_output DSI-2" | sudo tee -a /etc/sway/config > /dev/null
         echo "exec_always chromium --kiosk --app=http://127.0.0.1/" | sudo tee -a /etc/sway/config > /dev/null
         
         # Create autostart sh file
@@ -462,7 +443,8 @@ jobs:
         mkdir -p /home/cfpp-100ac
         chown cfpp-100ac:cfpp-100ac /home/cfpp-100ac
         
-        cat > /home/cfpp-100ac/.profile << PROF_EOF
+        cat > /home/cfpp-100ac/sway_run.sh << PROF_EOF
+        #!/bin/sh
         export XDG_SESSION_TYPE=wayland
         export XDG_SESSION_DESKTOP=sway
         export XDG_CURRENT_DESKTOP=sway # Sway usually sets this
@@ -472,11 +454,9 @@ jobs:
         export ELM_ACCEL=wayland
         export SDL_VIDEODRIVER=wayland
         export _JAVA_AWT_WM_NONREPARENTING=1
-        if [ -z "$XDG_RUNTIME_DIR" ]; then
-        	XDG_RUNTIME_DIR="/run/user/$(id -u)"
-        	mkdir -pm 0700 "$XDG_RUNTIME_DIR"
-        	export XDG_RUNTIME_DIR
-        fi
+        export XDG_RUNTIME_DIR="/run/user/\$(id -u)"
+        mkdir -pm 0700 "\$XDG_RUNTIME_DIR"
+        sway
         PROF_EOF
         
         # Add Broadcom WiFi modules to load at boot
