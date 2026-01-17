@@ -548,38 +548,18 @@ jobs:
         tmpfs           /var/log        tmpfs   defaults,noatime,nosuid,nodev,size=64M                    0    0
         EOF
         
-        # Copy boot files from /boot/firmware to the actual boot partition
-        echo "Copying boot files to boot partition..."
-        if [ -d /mnt/root/boot/firmware ] && [ "$(ls -A /mnt/root/boot/firmware)" ]; then
-            echo "Found boot files in /boot/firmware, copying to boot partition..."
-            sudo cp -a /mnt/root/boot/firmware/* /mnt/boot/
-            
-            # Verify critical files exist
-            if [ ! -f /mnt/boot/cmdline.txt ]; then
-                echo "ERROR: cmdline.txt not found - raspios-firmware package issue!"
-                exit 1
-            fi
-            if [ ! -f /mnt/boot/config.txt ]; then
-                echo "ERROR: config.txt not found - raspios-firmware package issue!"
-                exit 1
-            fi
-            
-            # Fix configuration file
-            echo "dtoverlay=i2c-rtc,ds3231" | sudo tee -a /mnt/boot/config.txt > /dev/null
-            echo "display_auto_detect=0" | sudo tee -a /mnt/boot/config.txt > /dev/null
-            echo "camera_auto_detect=0" | sudo tee -a /mnt/boot/config.txt > /dev/null
-            echo "dtoverlay=vc4-kms-dsi-waveshare-panel-v2,10_1_inch_a" | sudo tee -a /mnt/boot/config.txt > /dev/null
-            # ToDo add cfg80211.ieee80211_regdom=US and dsi display to cmdline.txt
-            
-            echo "Boot files copied from raspios-firmware package:"
-            echo "  - config.txt: $(cat /mnt/boot/config.txt)"
-            echo "  - cmdline.txt: $(cat /mnt/boot/cmdline.txt)"
-        else
-            echo "ERROR: No boot files found in /boot/firmware - check raspios-firmware package!"
-            exit 1
-        fi
+        # Fix configuration file
+        echo "dtoverlay=i2c-rtc,ds3231" | sudo tee -a /mnt/boot/config.txt > /dev/null
+        echo "display_auto_detect=0" | sudo tee -a /mnt/boot/config.txt > /dev/null
+        echo "camera_auto_detect=0" | sudo tee -a /mnt/boot/config.txt > /dev/null
+        echo "dtoverlay=vc4-kms-dsi-waveshare-panel-v2,10_1_inch_a" | sudo tee -a /mnt/boot/config.txt > /dev/null
+        # ToDo add cfg80211.ieee80211_regdom=US and dsi display to cmdline.txt
         
-        echo "✓ Boot partition configured with files from raspios-firmware package"
+        echo "Boot files:"
+        echo "  - config.txt: $(cat /mnt/boot/config.txt)"
+        echo "  - cmdline.txt: $(cat /mnt/boot/cmdline.txt)"
+        
+        echo "✓ Boot partition configured ..."
 
     - name: Create boot configuration system
       run: |
