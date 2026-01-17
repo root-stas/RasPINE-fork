@@ -266,6 +266,7 @@ jobs:
         
         # Fix the mkinitfs trigger error by creating the directory/file it expects
         mkdir -p /boot
+        echo "disable_trigger=\"YES\"" > /etc/mkinitfs/mkinitfs.conf
         touch /boot/initramfs 2>/dev/null || true
         
         # Update CA certificates to fix SSL/TLS issues
@@ -384,7 +385,6 @@ jobs:
         sed -i '/# fallback for any!device/i\# Allow Dialout to use /dev/ttyAMA[0-9]\nttyAMA[0-9]*        root:dialout 0660\n\n# For I2C devices\ni2c-[0-9]*          root:dialout 0660\n\n# For SPI devices\nspidev[0-9].[0-9]   root:dialout 0660\n' /etc/mdev.conf
         
         # Create necessary directories
-        mkdir -p /boot/firmware
         mkdir -p /var/log
         mkdir -p /usr/local/bin
         mkdir -p /run/user
@@ -401,43 +401,6 @@ jobs:
         echo "output DSI-2 transform 90" | sudo tee -a /etc/sway/config > /dev/null
         echo "input 9271:1070:11-005d_Goodix_Capacitive_TouchScreen map_to_output DSI-2" | sudo tee -a /etc/sway/config > /dev/null
         echo "exec_always chromium --kiosk --app=http://127.0.0.1/" | sudo tee -a /etc/sway/config > /dev/null
-        
-        # Create autostart sh file
-        mkdir -p /boot/firmware/cfpp-100ac
-        cat > /boot/firmware/cfpp-100ac/startup.sh << ASF
-        #!/bin/sh
-        # restart lo to localhost
-        rc-service networking restart
-        
-        fw=/boot/firmware/cfpp-100ac/update.zip
-        
-        rm -r -f /boot/firmware/cfpp-100ac/__*
-        rm -r -f /boot/firmware/cfpp-100ac/._*
-        rm -r -f /boot/firmware/cfpp-100ac/www/._*
-        rm -r -f /boot/firmware/cfpp-100ac/www/locale/._*
-        rm -r -f /boot/firmware/cfpp-100ac/www/fonts/._*
-        
-        if [ -e "\$fw" ]; then
-            rm -r -f /boot/firmware/cfpp-100ac/www
-            unzip -o "\$fw" -d /boot/firmware/cfpp-100ac/
-            rm -f "\$fw"
-            rm -f /boot/firmware/cfpp-100ac/config.json
-            reboot &
-            exit 0
-        fi
-        
-        iwctl ap ap0 start-profile CFPP-100AC
-        
-        iwctl station wlan0 scan
-        sleep 10
-        iwctl --passphrase 0445605879 station wlan0 connect KaNodNet-2G
-        
-        # start firmware
-        sleep 2
-        /usr/bin/python3 /boot/firmware/cfpp-100ac/main.py
-        ASF
-
-        ls /boot/firmware/cfpp-100ac
         
         echo -e  "@reboot sleep 5; sh /boot/firmware/cfpp-100ac/startup.sh" | sudo crontab -u root -
         
@@ -553,7 +516,7 @@ jobs:
         echo "/mnt/root/boot :"
         ls -R /mnt/root/boot
         echo "Copying boot files to boot partition..."
-        if [ -d /mnt/root/boot ] && [ "$(ls -A /mnt/root/boot)" ]; then
+        if [ -d /mnt/root/boot ]; then
             echo "Found boot files in /boot, copying to boot partition..."
             sudo cp -a /mnt/root/boot/* /mnt/boot/
             
@@ -591,7 +554,45 @@ jobs:
             exit 1
         fi
         
+        # Create autostart sh file
+        mkdir -p /mnt/boot/cfpp-100ac
+        cat > /mnt/boot/cfpp-100ac/startup.sh << ASF
+        #!/bin/sh
+        # restart lo to localhost
+        rc-service networking restart
+        
+        fw=/boot/firmware/cfpp-100ac/update.zip
+        
+        rm -r -f /boot/firmware/cfpp-100ac/__*
+        rm -r -f /boot/firmware/cfpp-100ac/._*
+        rm -r -f /boot/firmware/cfpp-100ac/www/._*
+        rm -r -f /boot/firmware/cfpp-100ac/www/locale/._*
+        rm -r -f /boot/firmware/cfpp-100ac/www/fonts/._*
+        
+        if [ -e "\$fw" ]; then
+            rm -r -f /boot/firmware/cfpp-100ac/www
+            unzip -o "\$fw" -d /boot/firmware/cfpp-100ac/
+            rm -f "\$fw"
+            rm -f /boot/firmware/cfpp-100ac/config.json
+            reboot &
+            exit 0
+        fi
+        
+        iwctl ap ap0 start-profile CFPP-100AC
+        
+        iwctl station wlan0 scan
+        sleep 10
+        iwctl --passphrase 0445605879 station wlan0 connect KaNodNet-2G
+        
+        # start firmware
+        sleep 2
+        /usr/bin/python3 /boot/firmware/cfpp-100ac/main.py
+        ASF
+
         echo "Boot files:"
+        echo "/mnt/boot :"
+        ls -R /mnt/boot
+        
         echo "  - config.txt: $(cat /mnt/boot/config.txt)"
         echo "  - cmdline.txt: $(cat /mnt/boot/cmdline.txt)"
         
