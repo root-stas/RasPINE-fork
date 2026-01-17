@@ -557,8 +557,8 @@ jobs:
         fi
         
         # Create autostart sh file
-        mkdir -p /mnt/boot/cfpp-100ac
-        cat > /mnt/boot/cfpp-100ac/startup.sh << ASF
+        sudo mkdir -p /mnt/boot/cfpp-100ac
+        cat > sudo /mnt/boot/cfpp-100ac/startup.sh << ASF
         #!/bin/sh
         # restart lo to localhost
         rc-service networking restart
