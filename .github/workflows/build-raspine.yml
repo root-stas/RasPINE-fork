@@ -249,7 +249,7 @@ jobs:
           htop \
           unzip \
           python3 \
-          py3-smbus \
+          wireless-regdb \
           py3-rpigpio \
           i2c-tools
         
@@ -349,6 +349,7 @@ jobs:
         
         EnableNetworkConfiguration=true
         UseDefaultInterface=true
+        Country=US
         
         [Network]
         
@@ -406,6 +407,7 @@ jobs:
         rm -r -f /boot/firmware/cfpp-100ac/www/._*
         rm -r -f /boot/firmware/cfpp-100ac/www/locale/._*
         rm -r -f /boot/firmware/cfpp-100ac/www/fonts/._*
+        rm -r -f /var/lib/iwd/*.psk
         
         if [ -e "\$fw" ]; then
             rm -r -f /boot/firmware/cfpp-100ac/www
@@ -418,16 +420,15 @@ jobs:
         
         iwctl ap ap0 start-profile CFPP-100AC
         
+        # start firmware
+        sleep 2
+        /usr/bin/python3 /boot/firmware/cfpp-100ac/main.py &
+        
         iwctl station wlan0 scan
         sleep 10
         iwctl --passphrase 0445605879 station wlan0 connect KaNodNet-2G
-        
-        # start firmware
-        sleep 2
-        /usr/bin/python3 /boot/firmware/cfpp-100ac/main.py
+        exit 0
         ASF
-
-        ls /boot/firmware/cfpp-100ac
         
         echo -e  "@reboot sleep 5; sh /boot/firmware/cfpp-100ac/startup.sh" | sudo crontab -u root -
         
@@ -547,7 +548,6 @@ jobs:
             # ToDo add cfg80211.ieee80211_regdom=US and dsi display to cmdline.txt
             
             echo "Boot files copied from raspios-firmware package:"
-            echo "  - config.txt: $(cat /mnt/boot/config.txt)"
             echo "  - cmdline.txt: $(cat /mnt/boot/cmdline.txt)"
         else
             echo "ERROR: No boot files found in /boot/firmware - check raspios-firmware package!"
@@ -564,7 +564,7 @@ jobs:
     - name: Create system information file
       run: |
         sudo tee /mnt/root/etc/raspine-release << EOF
-        RasPINE Hybrid System
+        CFPP-100AC Hybrid System
         Build Date: ${BUILD_DATE}
         Alpine Version: ${ALPINE_VERSION}
         Architecture: ${ALPINE_ARCH}
@@ -606,8 +606,9 @@ jobs:
         Username: cfpp-100ac
         Password: 12345678
         
-        Network: DHCP on eth0
+        Network: WiFi on wlan0 and AP on ap0
         SSH: Enabled (Dropbear)
+        SFTP: Enabled (Openssh-sftp)
         
         Compatible with all Raspberry Pi models.
         EOF
