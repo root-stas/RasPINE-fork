@@ -273,11 +273,30 @@ jobs:
             greetd-agreety
           
           rc-update add greetd default
+          cat > /usr/local/bin/sway-run << SWAY_EOF
+          #!/bin/sh
+          # Session
+          export XDG_SESSION_TYPE=wayland
+          export XDG_SESSION_DESKTOP=sway
+          export XDG_CURRENT_DESKTOP=sway
+          
+          # Wayland stuff
+          export MOZ_ENABLE_WAYLAND=1
+          export QT_QPA_PLATFORM=wayland
+          export SDL_VIDEODRIVER=wayland
+          export _JAVA_AWT_WM_NONREPARENTING=1
+          
+          # Launch Sway with a D-Bus server
+          exec dbus-run-session sway "$@"
+          SWAY_EOF
+          chmod +x /usr/local/bin/sway-run
+          
           cat > /etc/greetd/config.toml << GRET_EOF
           [terminal]
           vt = 1
           [default_session]
-          command = "/usr/bin/dbus-run-session /usr/bin/sway"
+          command = "/usr/local/bin/sway-run"
+          #command = "/usr/bin/dbus-run-session /usr/bin/sway"
           user = "cfpp-100ac"
           GRET_EOF
 
