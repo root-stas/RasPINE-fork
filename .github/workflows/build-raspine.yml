@@ -254,7 +254,7 @@ jobs:
           py3-rpigpio \
           i2c-tools
         
-        if [ "${IMAGE_SIZE}" == "true" ]; then
+        if [ "${ALPINE_KIOSK}" == "true" ]; then
           echo "Installing kiosk packages..."
           apk add --no-cache alpine-conf
           setup-wayland-base
@@ -290,7 +290,9 @@ jobs:
           echo "Config sway files..."
           echo "output DSI-2 transform 90" | sudo tee -a /etc/sway/config > /dev/null
           echo "input 9271:1070:11-005d_Goodix_Capacitive_TouchScreen map_to_output DSI-2" | sudo tee -a /etc/sway/config > /dev/null
-          echo "exec_always chromium --enable-features=UseOzonePlatform --ozone-platform=wayland --kiosk --no-first-run --disable-infobars --disable-session-crashed-bubble --disable-component-update --disable-pinch --app=http://127.0.0.1/ --no-sandbox --enable-zero-copy" | sudo tee -a /etc/sway/config > /dev/null
+          echo "exec_always chromium --enable-features=UseOzonePlatform --ozone-platform=wayland --kiosk --no-first-run \\
+          --disable-infobars --disable-session-crashed-bubble --disable-component-update --disable-pinch --app=http://127.0.0.1/ \\
+          --no-sandbox --enable-zero-copy" | sudo tee -a /etc/sway/config > /dev/null
         fi
         
         # Install Raspberry Pi kernels from RasPINE repo
