@@ -257,7 +257,7 @@ jobs:
         echo "Installing kiosk packages..."
         apk add --no-cache alpine-conf
         setup-wayland-base
-        apk add --no-cache chromium sway foot swaybar xwayland mesa-dri-gallium mesa-vulkan-broadcom mesa-egl font-dejavu ttf-freefont greetd
+        apk add --no-cache chromium sway foot swaybg swaybar xwayland mesa-dri-gallium mesa-vulkan-broadcom mesa-egl font-dejavu ttf-freefont greetd
         rc-update add greetd default
         
         echo "Config run files..."
@@ -381,6 +381,8 @@ jobs:
         echo 'net.ipv6.conf.all.disable_ipv6 = 1' >> /etc/sysctl.conf
         echo 'net.ipv6.conf.default.disable_ipv6 = 1' >> /etc/sysctl.conf
         echo 'net.ipv6.conf.lo.disable_ipv6 = 1' >> /etc/sysctl.conf
+
+        ln -sf /usr/share/zoneinfo/Europe/Kyiv /etc/localtime
         
         # Set iwd cfg
         cat > /etc/iwd/main.conf << IWDCONF
