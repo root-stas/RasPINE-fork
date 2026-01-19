@@ -28,6 +28,7 @@ on:
         options:
           - bookworm
           - bullseye
+          - trixie
       alpine_version:
         description: 'Alpine version to build for'
         required: true
@@ -150,7 +151,7 @@ jobs:
     if: |
       always() && 
       needs.fetch-and-convert.result == 'success' &&
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/test')
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/cfpp-100ac')
     
     permissions:
       contents: write
