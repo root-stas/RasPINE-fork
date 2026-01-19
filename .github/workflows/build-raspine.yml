@@ -254,11 +254,12 @@ jobs:
           py3-rpigpio \
           i2c-tools
         
-        #if [ "${ALPINE_KIOSK}" == "true" ]; then
+        if [ "${ALPINE_KIOSK}" == "true" ]; then
           echo "Installing kiosk packages..."
+        fi
           apk add --no-cache alpine-conf
           setup-wayland-base
-          apk add --no-cache chromium sway foot swaybar xwayland mesa-dri-gallium mesa-vulkan-broadcomm mesa-egl font-dejavu ttf-freefont greetd
+          apk add --no-cache chromium sway foot swaybar xwayland mesa-dri-gallium mesa-vulkan-broadcom mesa-egl font-dejavu ttf-freefont greetd
           rc-update add greetd default
           
           echo "Config run files..."
