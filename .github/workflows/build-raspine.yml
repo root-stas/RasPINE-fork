@@ -254,7 +254,7 @@ jobs:
           py3-rpigpio \
           i2c-tools
         
-        if [ "${ALPINE_KIOSK}" == "true" ]; then
+        #if [ "${ALPINE_KIOSK}" == "true" ]; then
           echo "Installing kiosk packages..."
           apk add --no-cache alpine-conf
           setup-wayland-base
@@ -293,7 +293,7 @@ jobs:
           echo "exec_always chromium --enable-features=UseOzonePlatform --ozone-platform=wayland --kiosk --no-first-run \\
           --disable-infobars --disable-session-crashed-bubble --disable-component-update --disable-pinch --app=http://127.0.0.1/ \\
           --no-sandbox --enable-zero-copy" | sudo tee -a /etc/sway/config > /dev/null
-        fi
+        #fi
         
         # Install Raspberry Pi kernels from RasPINE repo
         # Using --force-overwrite to handle overlay conflicts between packages
