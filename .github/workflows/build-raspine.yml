@@ -211,7 +211,6 @@ jobs:
         
         # Download and install RasPINE repository public key
         echo "Adding RasPINE repository key..."
-        #wget -O /etc/apk/keys/raspine.rsa.pub https://raspine.pistar.uk/raspine.rsa.pub
         wget -O /etc/apk/keys/raspine.rsa.pub https://root-stas.github.io/RasPINE-fork/raspine.rsa.pub
         
         # Set up Alpine repositories including RasPINE repo
@@ -219,7 +218,6 @@ jobs:
         cat > /etc/apk/repositories << REPOS
         https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION}/main
         https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION}/community
-        #https://raspine.pistar.uk/v${ALPINE_VERSION}/community
         https://root-stas.github.io/RasPINE-fork/v${ALPINE_VERSION}/community
         REPOS
         
@@ -256,7 +254,6 @@ jobs:
         
         if [ "${ALPINE_KIOSK}" == "true" ]; then
           echo "Installing kiosk packages..."
-        fi
           apk add --no-cache alpine-conf
           setup-wayland-base
           apk add --no-cache chromium sway foot swaybar xwayland mesa-dri-gallium mesa-vulkan-broadcom mesa-egl font-dejavu ttf-freefont greetd
@@ -274,7 +271,7 @@ jobs:
           export SDL_VIDEODRIVER=wayland
           export _JAVA_AWT_WM_NONREPARENTING=1
           
-          exec dbus-run-session sway "$@"
+          exec dbus-run-session sway
           SWAY_EOF
           chmod +x /usr/local/bin/sway-run
           
@@ -294,7 +291,7 @@ jobs:
           echo "exec_always chromium --enable-features=UseOzonePlatform --ozone-platform=wayland --kiosk --no-first-run \\
           --disable-infobars --disable-session-crashed-bubble --disable-component-update --disable-pinch --app=http://127.0.0.1/ \\
           --no-sandbox --enable-zero-copy" | sudo tee -a /etc/sway/config > /dev/null
-        #fi
+        fi
         
         # Install Raspberry Pi kernels from RasPINE repo
         # Using --force-overwrite to handle overlay conflicts between packages
