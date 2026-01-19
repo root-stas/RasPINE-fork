@@ -256,8 +256,7 @@ jobs:
           i2c-tools
         
         if [ "${ALPINE_KIOSK}" == "true" ]; then
-          echo "Installing kiosk packages..."
-        fi
+        echo "Installing kiosk packages..."
         apk add --no-cache alpine-conf
         setup-wayland-base
         apk add --no-cache chromium sway foot swaybar xwayland mesa-dri-gallium mesa-vulkan-broadcom mesa-egl font-dejavu ttf-freefont greetd
@@ -293,6 +292,7 @@ jobs:
         echo "exec_always chromium --enable-features=UseOzonePlatform --ozone-platform=wayland --kiosk --no-first-run \\
           --disable-infobars --disable-session-crashed-bubble --disable-component-update --disable-pinch --app=http://127.0.0.1/ \\
           --no-sandbox --enable-zero-copy" | sudo tee -a /etc/sway/config > /dev/null
+        fi
         
         # Install Raspberry Pi kernels from RasPINE repo
         # Using --force-overwrite to handle overlay conflicts between packages
