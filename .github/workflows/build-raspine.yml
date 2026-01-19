@@ -254,6 +254,7 @@ jobs:
         
         if [ "${ALPINE_KIOSK}" == "true" ]; then
           echo "Installing kiosk packages..."
+        fi
           apk add --no-cache alpine-conf
           setup-wayland-base
           apk add --no-cache chromium sway foot swaybar xwayland mesa-dri-gallium mesa-vulkan-broadcom mesa-egl font-dejavu ttf-freefont greetd
@@ -265,23 +266,19 @@ jobs:
           export XDG_SESSION_TYPE=wayland
           export XDG_SESSION_DESKTOP=sway
           export XDG_CURRENT_DESKTOP=sway
-          
           export MOZ_ENABLE_WAYLAND=1
           export QT_QPA_PLATFORM=wayland
           export SDL_VIDEODRIVER=wayland
           export _JAVA_AWT_WM_NONREPARENTING=1
-          
           exec dbus-run-session sway
           SWAY_EOF
           chmod +x /usr/local/bin/sway-run
-          
           echo "Config greetd files..."
           cat > /etc/greetd/config.toml << GRET_EOF
           [terminal]
           vt = 1
           [default_session]
           command = "/usr/local/bin/sway-run"
-          #command = "/usr/bin/dbus-run-session /usr/bin/sway"
           user = "cfpp-100ac"
           GRET_EOF
           
@@ -289,9 +286,9 @@ jobs:
           echo "output DSI-2 transform 90" | sudo tee -a /etc/sway/config > /dev/null
           echo "input 9271:1070:11-005d_Goodix_Capacitive_TouchScreen map_to_output DSI-2" | sudo tee -a /etc/sway/config > /dev/null
           echo "exec_always chromium --enable-features=UseOzonePlatform --ozone-platform=wayland --kiosk --no-first-run \\
-          --disable-infobars --disable-session-crashed-bubble --disable-component-update --disable-pinch --app=http://127.0.0.1/ \\
-          --no-sandbox --enable-zero-copy" | sudo tee -a /etc/sway/config > /dev/null
-        fi
+            --disable-infobars --disable-session-crashed-bubble --disable-component-update --disable-pinch --app=http://127.0.0.1/ \\
+            --no-sandbox --enable-zero-copy" | sudo tee -a /etc/sway/config > /dev/null
+        #fi
         
         # Install Raspberry Pi kernels from RasPINE repo
         # Using --force-overwrite to handle overlay conflicts between packages
