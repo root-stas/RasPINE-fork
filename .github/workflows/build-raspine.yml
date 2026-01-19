@@ -194,8 +194,6 @@ jobs:
         sudo mount -t sysfs none /mnt/root/sys
         sudo mount -o bind /dev /mnt/root/dev
         sudo mount -o bind /dev/pts /mnt/root/dev/pts || true
-
-        echo "Kiosk mode: ${ALPINE_KIOSK}"
         
         cat << 'EOF' | sudo tee /mnt/root/setup-alpine.sh
         #!/bin/sh
@@ -559,6 +557,8 @@ jobs:
         tmpfs           /var/log        tmpfs   defaults,noatime,nosuid,nodev,size=64M                    0    0
         EOF
         
+        echo "Kiosk mode: ${ALPINE_KIOSK}"
+        
         # Copy boot files from /boot/firmware to the actual boot partition
         echo "Copying boot files to boot partition..."
         if [ -d /mnt/root/boot/firmware ] && [ "$(ls -A /mnt/root/boot/firmware)" ]; then
@@ -579,6 +579,9 @@ jobs:
             echo "dtoverlay=i2c-rtc,ds3231" | sudo tee -a /mnt/boot/config.txt > /dev/null
             echo "display_auto_detect=0" | sudo tee -a /mnt/boot/config.txt > /dev/null
             echo "camera_auto_detect=0" | sudo tee -a /mnt/boot/config.txt > /dev/null
+            if [ "${ALPINE_KIOSK}" == "true" ]; then
+            echo "dtoverlay=vc4-kms-dsi-waveshare-panel-v2,10_1_inch_a" | sudo tee -a /mnt/boot/config.txt > /dev/null
+            fi
             # ToDo add cfg80211.ieee80211_regdom=US and dsi display to cmdline.txt
             
             echo "Boot files copied from raspios-firmware package:"
