@@ -186,6 +186,7 @@ jobs:
         sudo tee /mnt/root/etc/alpine-build-env << ENV_EOF
         export ALPINE_VERSION="${ALPINE_VERSION}"
         export ALPINE_ARCH="${ALPINE_ARCH}"
+        export ALPINE_KIOSK="${ALPINE_KIOSK}"
         ENV_EOF
         
         # Also mount necessary filesystems for chroot
@@ -194,7 +195,7 @@ jobs:
         sudo mount -o bind /dev /mnt/root/dev
         sudo mount -o bind /dev/pts /mnt/root/dev/pts || true
 
-        echo "Kiosk mode: ${ALPINE_ARCH}"
+        echo "Kiosk mode: ${ALPINE_KIOSK}"
         
         cat << 'EOF' | sudo tee /mnt/root/setup-alpine.sh
         #!/bin/sh
@@ -277,6 +278,7 @@ jobs:
         chmod +x /usr/local/bin/sway-run
         
         echo "Config greetd files..."
+        mkdir -p /etc/greetd/
         cat > /etc/greetd/config.toml << GRET_EOF
         [terminal]
         vt = 1
