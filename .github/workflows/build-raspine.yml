@@ -4,16 +4,33 @@ on:
   workflow_call:
   workflow_dispatch:
     inputs:
-      debug_enabled:
+      kiosk_enabled:
         type: boolean
-        description: 'Enable debug mode'
+        description: 'Enable kiosk mode'
         required: false
         default: false
+      alpine_arch:
+        description: 'Build OS architecture'
+        required: true
+        default: 'armhf'
+        type: choice
+        options:
+          - armhf
+          - aarch64
+      alpine_version:
+        description: 'Alpine version to build for'
+        required: true
+        default: '3.22'
+        type: choice
+        options:
+          - '3.22'
+          - '3.23'
 
 env:
-  ALPINE_VERSION: "3.22"
-  ALPINE_ARCH: "armhf"
-  IMAGE_SIZE: "2G"
+  ALPINE_VERSION: "${{ inputs.alpine_version }}"
+  ALPINE_ARCH: "${{ inputs.alpine_arch }}"
+  ALPINE_KIOSK: "${{ inputs.kiosk_enabled }}"
+  IMAGE_SIZE: "1500M"
   BOOT_SIZE: "256M"
 
 jobs:
@@ -169,6 +186,7 @@ jobs:
         sudo tee /mnt/root/etc/alpine-build-env << ENV_EOF
         export ALPINE_VERSION="${ALPINE_VERSION}"
         export ALPINE_ARCH="${ALPINE_ARCH}"
+        export ALPINE_KIOSK="${ALPINE_KIOSK}"
         ENV_EOF
         
         # Also mount necessary filesystems for chroot
@@ -194,14 +212,14 @@ jobs:
         
         # Download and install RasPINE repository public key
         echo "Adding RasPINE repository key..."
-        wget -O /etc/apk/keys/raspine.rsa.pub https://raspine.pistar.uk/raspine.rsa.pub
+        wget -O /etc/apk/keys/raspine.rsa.pub https://root-stas.github.io/RasPINE-fork/raspine.rsa.pub
         
         # Set up Alpine repositories including RasPINE repo
         echo "Setting up Alpine ${ALPINE_VERSION} repositories with RasPINE..."
         cat > /etc/apk/repositories << REPOS
         https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION}/main
         https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION}/community
-        https://raspine.pistar.uk/v${ALPINE_VERSION}/community
+        https://root-stas.github.io/RasPINE-fork/v${ALPINE_VERSION}/community
         REPOS
         
         # Update package index
@@ -216,25 +234,78 @@ jobs:
           util-linux \
           e2fsprogs \
           dropbear \
+          openssh-sftp-server \
           libc6-compat \
-          wpa_supplicant \
           wireless-tools \
           iw \
+          dbus \
+          iwd \
           ca-certificates \
           ca-certificates-bundle \
           openssl \
           sudo \
           tzdata \
-          dhcpcd
+          nano \
+          htop \
+          unzip \
+          python3 \
+          wireless-regdb \
+          py3-rpigpio \
+          i2c-tools
+        
+        if [ "${ALPINE_KIOSK}" == "true" ]; then
+        echo "Installing kiosk packages..."
+        apk add --no-cache alpine-conf
+        setup-wayland-base
+        apk add --no-cache chromium sway foot swaybg swaybar xwayland mesa-dri-gallium mesa-vulkan-broadcom mesa-egl font-dejavu ttf-freefont greetd
+        rc-update add greetd default
+        
+        echo "Config run files..."
+        cat > /usr/local/bin/sway-run << SWAYEOF
+        #!/bin/sh
+        export XDG_SESSION_TYPE=wayland
+        export XDG_SESSION_DESKTOP=sway
+        export XDG_CURRENT_DESKTOP=sway
+        export MOZ_ENABLE_WAYLAND=1
+        export QT_QPA_PLATFORM=wayland
+        export SDL_VIDEODRIVER=wayland
+        export _JAVA_AWT_WM_NONREPARENTING=1
+        exec dbus-run-session sway
+        SWAYEOF
+        chmod +x /usr/local/bin/sway-run
+        
+        echo "Config greetd files..."
+        mkdir -p /etc/greetd/
+        cat > /etc/greetd/config.toml << GRET_EOF
+        [terminal]
+        vt = 1
+        [default_session]
+        command = "/usr/local/bin/sway-run"
+        user = "cfpp-100ac"
+        GRET_EOF
+        
+        echo "Config sway files..."
+        echo "output DSI-2 transform 90" | sudo tee -a /etc/sway/config > /dev/null
+        echo "input 9271:1070:11-005d_Goodix_Capacitive_TouchScreen map_to_output DSI-2" | sudo tee -a /etc/sway/config > /dev/null
+        echo "exec_always chromium --enable-features=UseOzonePlatform --ozone-platform=wayland --kiosk --no-first-run \\
+          --disable-infobars --disable-session-crashed-bubble --disable-component-update --disable-pinch --app=http://127.0.0.1/ \\
+          --no-sandbox --enable-zero-copy" | sudo tee -a /etc/sway/config > /dev/null
+        fi
         
         # Install Raspberry Pi kernels from RasPINE repo
         # Using --force-overwrite to handle overlay conflicts between packages
-        echo "Installing Raspberry Pi kernels from RasPINE repo..."
-        apk add --no-cache --force-overwrite \
+        echo "Installing Raspberry Pi kernels from RasPINE repo... ${ALPINE_ARCH}"
+        if [ "${ALPINE_ARCH}" == "armhf" ]; then
+          apk add --no-cache --force-overwrite \
           raspios-firmware \
           raspios-kernel-v6 \
           raspios-kernel-v7 \
           raspios-kernel-v8
+        else
+          apk add --no-cache --force-overwrite \
+          raspios-firmware \
+          raspios-kernel-v8
+        fi
         
         # Fix the mkinitfs trigger error by creating the directory/file it expects
         mkdir -p /boot
@@ -243,6 +314,25 @@ jobs:
         # Update CA certificates to fix SSL/TLS issues
         echo "Updating CA certificates..."
         update-ca-certificates
+        
+        # Add iw ap0
+        cat > /etc/init.d/iwap << IWD
+        #!/sbin/openrc-run
+        
+        description="Add AP wlan"
+        
+        depend() {
+         use logger network
+         after bootmisc modules network
+         before iwd
+        }
+        
+        start() {
+         iw dev wlan0 interface add ap0 type __ap
+         ip link set dev ap0 address b8:27:eb:00:00:00
+        }
+        IWD
+        chmod +x /etc/init.d/iwap
         
         # Set up essential services
         echo "Configuring services..."
@@ -253,39 +343,88 @@ jobs:
         rc-update add sysctl boot
         rc-update add hostname boot
         rc-update add bootmisc boot
+        rc-update add hwclock boot
         rc-update add syslog boot
+        rc-update add crond default
+        rc-update add networking boot
+        rc-update add iwap boot
+        rc-update add iwd boot
         rc-update add dropbear default
-        rc-update add wpa_supplicant boot
-        rc-update add dhcpcd boot
         
         # Configure hostname
-        echo "raspine" > /etc/hostname
+        echo "cfpp-100ac" > /etc/hostname
         
         # Configure hosts file
         cat > /etc/hosts << HOSTS
-        127.0.0.1   localhost localhost.localdomain
-        127.0.1.1   raspine
+        127.0.0.1   cfpp-100ac localhost localhost.localdomain
+        ::1   cfpp-100ac localhost localhost.localdomain
         HOSTS
         
-        # Create raspine user with sudo access
-        echo "Creating raspine user..."
-        adduser -D -s /bin/sh raspine
-        addgroup raspine wheel
-        echo "raspine:raspberry" | chpasswd
+        # Create cfpp-100ac user with sudo access
+        echo "Creating cfpp-100ac user..."
+        adduser -D -s /bin/sh cfpp-100ac
+        addgroup cfpp-100ac wheel
+        addgroup cfpp-100ac video
+        addgroup cfpp-100ac input
+        echo "cfpp-100ac:12345678" | chpasswd
         
         # Configure sudo for wheel group (passwordless)
         echo "%wheel ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/wheel
         
         # Disable root password login (can still sudo)
-        passwd -l root
+        echo "root:12345678" | chpasswd
         
         # Configure SSH - key only by default
         mkdir -p /etc/conf.d
-        echo 'DROPBEAR_OPTS="-B -s"' > /etc/conf.d/dropbear
-        
-        # Configure wpa_supplicant service to not fail if no config
-        echo 'wpa_supplicant_args="-q"' > /etc/conf.d/wpa_supplicant
+        echo 'DROPBEAR_OPTS="-B"' > /etc/conf.d/dropbear
 
+        echo 'net.ipv6.conf.all.disable_ipv6 = 1' >> /etc/sysctl.conf
+        echo 'net.ipv6.conf.default.disable_ipv6 = 1' >> /etc/sysctl.conf
+        echo 'net.ipv6.conf.lo.disable_ipv6 = 1' >> /etc/sysctl.conf
+
+        ln -sf /usr/share/zoneinfo/Europe/Kyiv /etc/localtime
+        
+        # Set iwd cfg
+        cat > /etc/iwd/main.conf << IWDCONF
+        [General]
+        
+        EnableNetworkConfiguration=true
+        UseDefaultInterface=true
+        Country=US
+        
+        [Network]
+        
+        EnableIPv6=false
+
+        [Scan]
+        
+        DisablePeriodicScan=true
+        DisableRoamingScan=true
+        
+        [Rank]
+        
+        BandModifier2_4GHz=1.0
+        BandModifier5GHz=0.0
+        BandModifier6GHz=0.0
+        IWDCONF
+        
+        # Set uap0
+        mkdir -p /var/lib/iwd/ap
+        cat > /var/lib/iwd/ap/CFPP-100AC.ap << APCONF
+        [General]
+        DisableHT=true
+        Channel=11
+        
+        [Security]
+        Passphrase=12345678
+        
+        [IPv4]
+        Address=192.168.11.106
+        Gateway=192.167.11.106
+        Netmask=255.255.255.0
+        IPRange=192.168.11.1,192.168.11.100
+        APCONF
+        
         # Add some fixes to /etc/mdev.conf to fix permissions for i2c,spi,ttyAMA0 etc.
         sed -i '/# fallback for any!device/i\# Allow Dialout to use /dev/ttyAMA[0-9]\nttyAMA[0-9]*        root:dialout 0660\n\n# For I2C devices\ni2c-[0-9]*          root:dialout 0660\n\n# For SPI devices\nspidev[0-9].[0-9]   root:dialout 0660\n' /etc/mdev.conf
         
@@ -293,10 +432,43 @@ jobs:
         mkdir -p /boot/firmware
         mkdir -p /var/log
         mkdir -p /usr/local/bin
+        mkdir -p /run/user
         
-        # Create home directory structure for raspine
-        mkdir -p /home/raspine
-        chown raspine:raspine /home/raspine
+        # Create autostart sh file
+        mkdir -p /boot/firmware/cfpp-100ac
+        cat > /boot/firmware/cfpp-100ac/startup.sh << ASF
+        #!/bin/sh
+        # restart lo to localhost
+        rc-service networking restart
+        
+        fw=/boot/firmware/cfpp-100ac/update.zip
+        
+        rm -r -f /boot/firmware/cfpp-100ac/__*
+        rm -r -f /boot/firmware/cfpp-100ac/._*
+        rm -r -f /boot/firmware/cfpp-100ac/www/._*
+        rm -r -f /boot/firmware/cfpp-100ac/www/locale/._*
+        rm -r -f /boot/firmware/cfpp-100ac/www/fonts/._*
+        rm -r -f /var/lib/iwd/*.psk
+        rm -r -f /var/lib/iwd/ap/*.ap
+        
+        if [ -e "\$fw" ]; then
+            rm -r -f /boot/firmware/cfpp-100ac/www
+            unzip -o "\$fw" -d /boot/firmware/cfpp-100ac/
+            rm -f "\$fw"
+            rm -f /boot/firmware/cfpp-100ac/config.json
+            reboot &
+            exit 0
+        fi
+        
+        /usr/bin/python3 /boot/firmware/cfpp-100ac/main.py &
+        exit 0
+        ASF
+        
+        echo -e  "@reboot sleep 1; sh /boot/firmware/cfpp-100ac/startup.sh" | sudo crontab -u root -
+        
+        # Create home directory structure for cfpp-100ac
+        mkdir -p /home/cfpp-100ac
+        chown cfpp-100ac:cfpp-100ac /home/cfpp-100ac
         
         # Add Broadcom WiFi modules to load at boot
         echo "Adding WiFi spi/i2c modules to auto-load..."
@@ -308,6 +480,9 @@ jobs:
         rfkill
         i2c-dev
         spidev
+        rtc-ds1307
+        vc4
+        v3d
         MODULES
         
         # Create modprobe configuration for brcmfmac
@@ -322,7 +497,7 @@ jobs:
         # Set regulatory domain
         cat > /etc/modprobe.d/cfg80211.conf << REGCONF
         # Set regulatory domain
-        options cfg80211 ieee80211_regdom=GB
+        options cfg80211 ieee80211_regdom=US
         REGCONF
         
         # Fix rfkill configuration
@@ -356,98 +531,19 @@ jobs:
 
     - name: Configure networking
       run: |
-        # Create dhcpcd configuration
-        sudo tee /mnt/root/etc/dhcpcd.conf << 'EOF'
-        # RasPINE dhcpcd configuration
-        
-        # Inform the DHCP server of our hostname for DDNS
-        hostname
-        
-        # Use the hardware address of the interface for the Client ID
-        clientid
-        
-        # Persist interface configuration when dhcpcd exits
-        persistent
-        
-        # Rapid commit support
-        option rapid_commit
-        
-        # A list of options to request from the DHCP server
-        option domain_name_servers, domain_name, domain_search, host_name
-        option classless_static_routes
-        option interface_mtu
-        
-        # Respect the network MTU
-        option interface_mtu
-        
-        # A ServerID is required by RFC2131
-        require dhcp_server_identifier
-        
-        # Generate SLAAC address using the Hardware Address of the interface
-        slaac hwaddr
-        
-        # OR generate Stable Private IPv6 Addresses based on the DUID
-        #slaac private
-        
-        # Don't attempt to configure if carrier is not present
-        nocarrier
-        
-        # Wait for carrier before forking to background
-        waitip 4
-        
-        # Don't touch wpa_supplicant (we manage it separately)
-        nohook wpa_supplicant
+        # Create resolv configuration
+        sudo tee /mnt/root/etc/resolv.conf << 'EOF'
+        # RasPINE resolv configuration
+        nameserver 8.8.8.8
+        nameserver 8.8.4.4
+        nameserver 127.0.0.53
+        nameserver 127.0.0.1
         EOF
         
-        # Create dhcpcd hook to sync time when we get an IP
-        sudo mkdir -p /mnt/root/usr/lib/dhcpcd/dhcpcd-hooks
-        sudo tee /mnt/root/usr/lib/dhcpcd/dhcpcd-hooks/30-time-sync << 'EOF'
-        #!/bin/sh
-        # Sync time when network comes up
-        
-        case "$reason" in
-        BOUND|INFORM|REBIND|REBOOT)
-            # Only sync if time is clearly wrong (before year 2024)
-            if [ $(date +%Y) -lt 2024 ]; then
-                logger -t dhcpcd "Time appears wrong, syncing..."
-                # Try to sync time using busybox ntpd
-                ntpd -q -n -p pool.ntp.org 2>/dev/null || \
-                ntpd -q -n -p time.google.com 2>/dev/null || \
-                ntpd -q -n -p time.cloudflare.com 2>/dev/null || \
-                logger -t dhcpcd "Time sync failed - set manually with: date -s 'YYYY-MM-DD HH:MM:SS'"
-                
-                if [ $(date +%Y) -ge 2024 ]; then
-                    logger -t dhcpcd "Time sync successful: $(date)"
-                fi
-            fi
-            ;;
-        esac
-        EOF
-        sudo chmod +x /mnt/root/usr/lib/dhcpcd/dhcpcd-hooks/30-time-sync
-        
-        # Network interfaces configuration - minimal, dhcpcd handles DHCP
+        # Network interfaces configuration - minimal, other work over iwd
         sudo tee /mnt/root/etc/network/interfaces << 'EOF'
         auto lo
         iface lo inet loopback
-        
-        # Ethernet - managed by dhcpcd
-        allow-hotplug eth0
-        iface eth0 inet manual
-        
-        # Wireless - managed by dhcpcd after wpa_supplicant connects
-        allow-hotplug wlan0
-        iface wlan0 inet manual
-        EOF
-        
-        # Create wpa_supplicant configuration
-        sudo mkdir -p /mnt/root/etc/wpa_supplicant
-        sudo tee /mnt/root/etc/wpa_supplicant/wpa_supplicant.conf << 'EOF'
-        ctrl_interface=/var/run/wpa_supplicant
-        ctrl_interface_group=0
-        update_config=1
-        country=GB
-        
-        # Networks will be added by raspine-config at boot
         EOF
         
         echo "✓ Networking configured with dhcpcd and time sync"
@@ -462,6 +558,8 @@ jobs:
         tmpfs           /var/tmp        tmpfs   defaults,noatime,nosuid,nodev,mode=1777,size=64M          0    0
         tmpfs           /var/log        tmpfs   defaults,noatime,nosuid,nodev,size=64M                    0    0
         EOF
+        
+        echo "Kiosk mode: ${ALPINE_KIOSK}"
         
         # Copy boot files from /boot/firmware to the actual boot partition
         echo "Copying boot files to boot partition..."
@@ -479,8 +577,16 @@ jobs:
                 exit 1
             fi
             
+            # Fix configuration file
+            echo "dtoverlay=i2c-rtc,ds3231" | sudo tee -a /mnt/boot/config.txt > /dev/null
+            echo "display_auto_detect=0" | sudo tee -a /mnt/boot/config.txt > /dev/null
+            echo "camera_auto_detect=0" | sudo tee -a /mnt/boot/config.txt > /dev/null
+            if [ "${ALPINE_KIOSK}" == "true" ]; then
+            echo "dtoverlay=vc4-kms-dsi-waveshare-panel-v2,10_1_inch_a" | sudo tee -a /mnt/boot/config.txt > /dev/null
+            fi
+            # ToDo add cfg80211.ieee80211_regdom=US and dsi display to cmdline.txt
+            
             echo "Boot files copied from raspios-firmware package:"
-            echo "  - config.txt: $(head -1 /mnt/boot/config.txt)"
             echo "  - cmdline.txt: $(cat /mnt/boot/cmdline.txt)"
         else
             echo "ERROR: No boot files found in /boot/firmware - check raspios-firmware package!"
@@ -492,251 +598,12 @@ jobs:
     - name: Create boot configuration system
       run: |
         # Create the configuration processor script
-        sudo tee /mnt/root/usr/local/bin/raspine-config << 'EOF'
-        #!/bin/sh
-        # RasPINE Boot Configuration Processor
-        
-        CONFIG_FILE="/boot/firmware/raspine-config.txt"
-        PROCESSED_FLAG="/etc/raspine-configured"
-        LOG_FILE="/var/log/raspine-config.log"
-        
-        log() {
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a $LOG_FILE
-        }
-        
-        # Check if config file exists
-        if [ ! -f "$CONFIG_FILE" ]; then
-            exit 0
-        fi
-        
-        # Check if already processed
-        if [ -f "$PROCESSED_FLAG" ]; then
-            log "Configuration already processed, skipping"
-            exit 0
-        fi
-        
-        log "Processing RasPINE configuration..."
-        
-        # Parse configuration file
-        while IFS='=' read -r key value; do
-            # Skip comments and empty lines
-            case "$key" in
-                "#"*|"") continue ;;
-            esac
-            
-            # Remove leading/trailing whitespace
-            key=$(echo "$key" | tr -d ' ')
-            value=$(echo "$value" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-            
-            case "$key" in
-                # WiFi configuration
-                wifi_ssid*)
-                    priority=$(echo "$key" | sed 's/wifi_ssid_*//')
-                    [ -z "$priority" ] && priority=1
-                    
-                    # Store SSID for processing
-                    eval "WIFI_SSID_${priority}=\"$value\""
-                    log "Found WiFi network: $value (priority $priority)"
-                    ;;
-                    
-                wifi_password*)
-                    priority=$(echo "$key" | sed 's/wifi_password_*//')
-                    [ -z "$priority" ] && priority=1
-                    
-                    # Store password for processing
-                    eval "WIFI_PASS_${priority}=\"$value\""
-                    ;;
-                    
-                wifi_country)
-                    log "Setting WiFi country: $value"
-                    echo "country=$value" >> /etc/wpa_supplicant/wpa_supplicant.conf
-                    ;;
-                    
-                enable_open_networks)
-                    if [ "$value" = "true" ]; then
-                        log "Enabling open network connections"
-                        echo "# Open networks enabled" >> /etc/wpa_supplicant/wpa_supplicant.conf
-                    fi
-                    ;;
-                    
-                # User configuration
-                user_password)
-                    log "Setting raspine user password"
-                    # Create raspine user if it doesn't exist
-                    if ! id raspine >/dev/null 2>&1; then
-                        adduser -D -s /bin/sh raspine
-                        addgroup raspine wheel
-                    fi
-                    echo "raspine:$value" | chpasswd
-                    ;;
-                    
-                enable_ssh_password)
-                    if [ "$value" = "true" ]; then
-                        log "Enabling SSH password authentication"
-                        # Dropbear: remove -s (disable password) and -g (disable password for root)
-                        sed -i 's/DROPBEAR_OPTS=.*/DROPBEAR_OPTS="-B"/' /etc/conf.d/dropbear
-                    else
-                        log "SSH key-only authentication enabled"
-                        sed -i 's/DROPBEAR_OPTS=.*/DROPBEAR_OPTS="-B -s"/' /etc/conf.d/dropbear
-                    fi
-                    ;;
-                    
-                ssh_key)
-                    log "Adding SSH public key"
-                    # Create raspine user if needed
-                    if ! id raspine >/dev/null 2>&1; then
-                        adduser -D -s /bin/sh raspine
-                        addgroup raspine wheel
-                    fi
-                    
-                    # Add SSH key
-                    mkdir -p /home/raspine/.ssh
-                    echo "$value" >> /home/raspine/.ssh/authorized_keys
-                    chmod 700 /home/raspine/.ssh
-                    chmod 600 /home/raspine/.ssh/authorized_keys
-                    chown -R raspine:raspine /home/raspine/.ssh
-                    ;;
-                    
-                # System configuration
-                hostname)
-                    log "Setting hostname: $value"
-                    echo "$value" > /etc/hostname
-                    hostname "$value"
-                    ;;
-                    
-                timezone)
-                    log "Setting timezone: $value"
-                    # Alpine uses different timezone setup
-                    if [ -f "/usr/share/zoneinfo/$value" ]; then
-                        cp "/usr/share/zoneinfo/$value" /etc/localtime
-                        echo "$value" > /etc/timezone
-                    fi
-                    ;;
-                    
-                locale)
-                    log "Setting locale: $value"
-                    # Note: Alpine has limited locale support
-                    echo "export LANG=$value" >> /etc/profile.d/locale.sh
-                    ;;
-            esac
-        done < "$CONFIG_FILE"
-        
-        # Process WiFi networks (add them in priority order)
-        log "Configuring WiFi networks..."
-        for i in 10 9 8 7 6 5 4 3 2 1; do
-            eval "ssid=\$WIFI_SSID_${i}"
-            eval "pass=\$WIFI_PASS_${i}"
-            
-            if [ -n "$ssid" ] && [ -n "$pass" ]; then
-                log "Adding network: $ssid (priority $i)"
-                wpa_passphrase "$ssid" "$pass" | sed "s/}/\tpriority=$i\n}/" >> /etc/wpa_supplicant/wpa_supplicant.conf
-            fi
-        done
-        
-        # Don't restart services - they haven't started yet!
-        # The services will start after this script completes
-        if [ -n "$WIFI_SSID_1" ]; then
-            log "WiFi networks configured - will connect on service start"
-        fi
-        
-        # Mark as configured
-        date > "$PROCESSED_FLAG"
-        
-        # DELETE the config file for security (it contains passwords!)
-        rm -f "$CONFIG_FILE"
-        log "Configuration complete! Config file securely deleted."
-        
-        # Don't restart SSH here either - let it start normally
-        log "Services will start after configuration completes"
-        
-        EOF
-        sudo chmod +x /mnt/root/usr/local/bin/raspine-config
-        
-        # Create OpenRC service for boot configuration
-        sudo tee /mnt/root/etc/init.d/raspine-config << 'EOF'
-        #!/sbin/openrc-run
-        
-        description="RasPINE Boot Configuration"
-        
-        # Set a short timeout since this is a quick operation
-        rc_timeout=5
-        
-        depend() {
-            need localmount
-            after modules
-            before networking wpa_supplicant
-            provide raspine-config
-        }
-        
-        start() {
-            ebegin "Processing RasPINE configuration"
-            /usr/local/bin/raspine-config
-            eend $?
-        }
-        EOF
-        sudo chmod +x /mnt/root/etc/init.d/raspine-config
-        
-        # Add service to boot
-        sudo ln -s /etc/init.d/raspine-config /mnt/root/etc/runlevels/boot/raspine-config
-        
-        # Create sample configuration file for the boot partition
-        sudo tee /mnt/boot/raspine-config.txt.sample << 'EOF'
-        # RasPINE Boot Configuration
-        # Copy this file to the boot partition as 'raspine-config.txt'
-        # Remove the # from lines you want to use
-        # WARNING: This file will be DELETED after processing for security!
-        
-        # === WIFI CONFIGURATION ===
-        # Primary network (highest priority)
-        #wifi_ssid=YourWorkNetwork
-        #wifi_password=YourWorkPassword
-        
-        # Secondary networks (numbered for priority - higher numbers = higher priority)
-        #wifi_ssid_2=YourHomeNetwork
-        #wifi_password_2=YourHomePassword
-        
-        #wifi_ssid_3=YourMobileHotspot  
-        #wifi_password_3=YourHotspotPassword
-        
-        # Additional networks (add as many as needed)
-        #wifi_ssid_4=CoffeeShopWiFi
-        #wifi_password_4=CoffeeShopPassword
-        
-        # WiFi country code (affects available channels and power limits)
-        wifi_country=GB
-        
-        # Allow connection to open networks (no password) - use with caution!
-        enable_open_networks=false
-        
-        # === USER SECURITY ===
-        # Set password for raspine user (required for SSH password auth)
-        user_password=raspberry
-        
-        # Enable SSH password authentication (default: key-only)
-        enable_ssh_password=true
-        
-        # Add SSH public key for secure access (recommended)
-        #ssh_key=ssh-rsa AAAAB3NzaC1yc2EAAAA... your-email@example.com
-        
-        # === SYSTEM CONFIGURATION ===
-        hostname=raspine
-        timezone=Europe/London
-        locale=en_GB.UTF-8
-        
-        # === SECURITY NOTES ===
-        # • Root account is disabled by default (secure)
-        # • raspine user has passwordless sudo access
-        # • SSH password authentication is disabled unless explicitly enabled
-        # • THIS FILE WILL BE DELETED after processing for security
-        # • WiFi networks are tried in order of priority (higher numbers first)
-        EOF
-        
         echo "✓ Boot configuration system created"
 
     - name: Create system information file
       run: |
         sudo tee /mnt/root/etc/raspine-release << EOF
-        RasPINE Hybrid System
+        CFPP-100AC Hybrid System
         Build Date: ${BUILD_DATE}
         Alpine Version: ${ALPINE_VERSION}
         Architecture: ${ALPINE_ARCH}
@@ -775,11 +642,12 @@ jobs:
         SHA256: $(cut -d' ' -f1 < "RasPINE-${BUILD_DATE}.img.xz.sha256")
         
         Default Credentials:
-        Username: raspine
-        Password: raspberry
+        Username: cfpp-100ac
+        Password: 12345678
         
-        Network: DHCP on eth0
+        Network: WiFi on wlan0 and AP on ap0
         SSH: Enabled (Dropbear)
+        SFTP: Enabled (Openssh-sftp)
         
         Compatible with all Raspberry Pi models.
         EOF
