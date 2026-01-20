@@ -210,26 +210,24 @@ jobs:
           echo "nameserver 8.8.4.4" >> /etc/resolv.conf
         }
         
-        # Download and install RasPINE repository public key
-        echo "Adding RasPINE repository key..."
-        wget -O /etc/apk/keys/raspine.rsa.pub https://root-stas.github.io/RasPINE-fork/raspine.rsa.pub
-        
-        # Set up Alpine repositories including RasPINE repo
-        echo "Setting up Alpine ${ALPINE_VERSION} repositories with RasPINE..."
+        # Set up Alpine repositories
+        echo "Setting up Alpine ${ALPINE_VERSION} repositories..."
         cat > /etc/apk/repositories << REPOS
         https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION}/main
         https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION}/community
-        https://root-stas.github.io/RasPINE-fork/v${ALPINE_VERSION}/community
         REPOS
         
         # Update package index
         echo "Updating package index..."
         apk update
         
-        # Install base packages plus WiFi support, sudo, and dhcpcd
+        # Install base packages plus WiFi support, sudo, ...
         echo "Installing packages..."
         apk add --no-cache \
           alpine-base \
+          linux-rpi \
+          raspberrypi-bootloader \
+          raspberrypi-bootloader-cutdown \
           openrc \
           util-linux \
           e2fsprogs \
@@ -292,24 +290,9 @@ jobs:
           --no-sandbox --enable-zero-copy" | sudo tee -a /etc/sway/config > /dev/null
         fi
         
-        # Install Raspberry Pi kernels from RasPINE repo
-        # Using --force-overwrite to handle overlay conflicts between packages
-        echo "Installing Raspberry Pi kernels from RasPINE repo... ${ALPINE_ARCH}"
-        if [ "${ALPINE_ARCH}" == "armhf" ]; then
-          apk add --no-cache --force-overwrite \
-          raspios-firmware \
-          raspios-kernel-v6 \
-          raspios-kernel-v7 \
-          raspios-kernel-v8
-        else
-          apk add --no-cache --force-overwrite \
-          raspios-firmware \
-          raspios-kernel-v8
-        fi
-        
         # Fix the mkinitfs trigger error by creating the directory/file it expects
-        mkdir -p /boot
-        touch /boot/initramfs 2>/dev/null || true
+        #mkdir -p /boot
+        #touch /boot/initramfs 2>/dev/null || true
         
         # Update CA certificates to fix SSL/TLS issues
         echo "Updating CA certificates..."
@@ -429,42 +412,44 @@ jobs:
         sed -i '/# fallback for any!device/i\# Allow Dialout to use /dev/ttyAMA[0-9]\nttyAMA[0-9]*        root:dialout 0660\n\n# For I2C devices\ni2c-[0-9]*          root:dialout 0660\n\n# For SPI devices\nspidev[0-9].[0-9]   root:dialout 0660\n' /etc/mdev.conf
         
         # Create necessary directories
-        mkdir -p /boot/firmware
+        mkdir -p /boot/cfpp-100ac
         mkdir -p /var/log
         mkdir -p /usr/local/bin
         mkdir -p /run/user
         
         # Create autostart sh file
-        mkdir -p /boot/firmware/cfpp-100ac
-        cat > /boot/firmware/cfpp-100ac/startup.sh << ASF
+        cat > /boot/cfpp-100ac/startup.sh << ASF
         #!/bin/sh
+        # Sync RTC clock
+        hwclock -s
+        
         # restart lo to localhost
         rc-service networking restart
         
-        fw=/boot/firmware/cfpp-100ac/update.zip
+        fw=/boot/cfpp-100ac/update.zip
         
-        rm -r -f /boot/firmware/cfpp-100ac/__*
-        rm -r -f /boot/firmware/cfpp-100ac/._*
-        rm -r -f /boot/firmware/cfpp-100ac/www/._*
-        rm -r -f /boot/firmware/cfpp-100ac/www/locale/._*
-        rm -r -f /boot/firmware/cfpp-100ac/www/fonts/._*
+        rm -r -f /boot/cfpp-100ac/__*
+        rm -r -f /boot/cfpp-100ac/._*
+        rm -r -f /boot/cfpp-100ac/www/._*
+        rm -r -f /boot/cfpp-100ac/www/locale/._*
+        rm -r -f /boot/cfpp-100ac/www/fonts/._*
         rm -r -f /var/lib/iwd/*.psk
         rm -r -f /var/lib/iwd/ap/*.ap
         
         if [ -e "\$fw" ]; then
-            rm -r -f /boot/firmware/cfpp-100ac/www
+            rm -r -f /boot/cfpp-100ac/www
             unzip -o "\$fw" -d /boot/firmware/cfpp-100ac/
             rm -f "\$fw"
-            rm -f /boot/firmware/cfpp-100ac/config.json
+            rm -f /boot/cfpp-100ac/config.json
             reboot &
             exit 0
         fi
         
-        /usr/bin/python3 /boot/firmware/cfpp-100ac/main.py &
+        /usr/bin/python3 /boot/cfpp-100ac/main.py &
         exit 0
         ASF
         
-        echo -e  "@reboot sleep 1; sh /boot/firmware/cfpp-100ac/startup.sh" | sudo crontab -u root -
+        echo -e  "@reboot sleep 1; sh /boot/cfpp-100ac/startup.sh" | sudo crontab -u root -
         
         # Create home directory structure for cfpp-100ac
         mkdir -p /home/cfpp-100ac
@@ -552,7 +537,7 @@ jobs:
       run: |
         # Create fstab
         sudo tee /mnt/root/etc/fstab << 'EOF'
-        /dev/mmcblk0p1  /boot/firmware  vfat    defaults,noatime                                          0    2
+        /dev/mmcblk0p1  /boot           vfat    defaults,noatime                                          0    2
         /dev/mmcblk0p2  /               ext4    defaults,noatime                                          0    1
         tmpfs           /tmp            tmpfs   defaults,noatime,nosuid,nodev,noexec,mode=1777,size=96M   0    0
         tmpfs           /var/tmp        tmpfs   defaults,noatime,nosuid,nodev,mode=1777,size=64M          0    0
@@ -561,19 +546,20 @@ jobs:
         
         echo "Kiosk mode: ${ALPINE_KIOSK}"
         
-        # Copy boot files from /boot/firmware to the actual boot partition
+        # Copy boot files from /boot to the actual boot partition
         echo "Copying boot files to boot partition..."
-        if [ -d /mnt/root/boot/firmware ] && [ "$(ls -A /mnt/root/boot/firmware)" ]; then
-            echo "Found boot files in /boot/firmware, copying to boot partition..."
-            sudo cp -a /mnt/root/boot/firmware/* /mnt/boot/
+        if [ -d /mnt/root/boot ] && [ "$(ls -A /mnt/root/boot)" ]; then
+            echo "Found boot files in /mnt/root/boot, copying to boot partition..."
+            sudo rm /mnt/root/boot/boot
+            sudo cp -a /mnt/root/boot/* /mnt/boot/
             
             # Verify critical files exist
             if [ ! -f /mnt/boot/cmdline.txt ]; then
-                echo "ERROR: cmdline.txt not found - raspios-firmware package issue!"
+                echo "ERROR: cmdline.txt not found - firmware package issue!"
                 exit 1
             fi
             if [ ! -f /mnt/boot/config.txt ]; then
-                echo "ERROR: config.txt not found - raspios-firmware package issue!"
+                echo "ERROR: config.txt not found - firmware package issue!"
                 exit 1
             fi
             
@@ -586,14 +572,15 @@ jobs:
             fi
             # ToDo add cfg80211.ieee80211_regdom=US and dsi display to cmdline.txt
             
-            echo "Boot files copied from raspios-firmware package:"
+            echo "Boot files copied from firmware package:"
+            echo "  - config.txt: $(cat /mnt/boot/config.txt)"
             echo "  - cmdline.txt: $(cat /mnt/boot/cmdline.txt)"
         else
-            echo "ERROR: No boot files found in /boot/firmware - check raspios-firmware package!"
+            echo "ERROR: No boot files found in /mnt/root/boot - check firmware package!"
             exit 1
         fi
         
-        echo "✓ Boot partition configured with files from raspios-firmware package"
+        echo "✓ Boot partition configured with files from firmware package"
 
     - name: Create boot configuration system
       run: |
