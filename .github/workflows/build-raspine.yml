@@ -451,7 +451,7 @@ jobs:
         
         #echo -e  "@reboot sleep 1; sh /boot/cfpp-100ac/startup.sh" | sudo crontab -u root -
         # Set cron task
-        cat > /etc/crontab/root << CRCONF
+        cat > /etc/crontabs/root << CRCONF
         @reboot sleep 1; sh /boot/cfpp-100ac/startup.sh
         CRCONF
         
