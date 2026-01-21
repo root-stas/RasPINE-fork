@@ -449,7 +449,11 @@ jobs:
         exit 0
         ASF
         
-        echo -e  "@reboot sleep 1; sh /boot/cfpp-100ac/startup.sh" | sudo crontab -u root -
+        #echo -e  "@reboot sleep 1; sh /boot/cfpp-100ac/startup.sh" | sudo crontab -u root -
+        # Set cron task
+        cat > /etc/crontab/root << CRCONF
+        @reboot sleep 1; sh /boot/cfpp-100ac/startup.sh
+        CRCONF
         
         # Create home directory structure for cfpp-100ac
         mkdir -p /home/cfpp-100ac
@@ -493,7 +497,7 @@ jobs:
         RFKILLCONF
         
         # Cleanup the initramfs file we created
-        rm -f /boot/initramfs 2>/dev/null || true
+        #rm -f /boot/initramfs 2>/dev/null || true
         
         echo "Alpine ${ALPINE_VERSION} configuration complete!"
         EOF
@@ -564,19 +568,18 @@ jobs:
                 echo "kernel=boot/vmlinuz-rpi" | sudo tee -a /mnt/boot/config.txt > /dev/null
                 echo "initramfs boot/initramfs-rpi" | sudo tee -a /mnt/boot/config.txt > /dev/null
                 echo "arm_64bit=1" | sudo tee -a /mnt/boot/config.txt > /dev/null
-                echo "auto_initramfs=1" | sudo tee -a /mnt/boot/config.txt > /dev/null
-                echo "disable_fw_kms_setup=1" | sudo tee -a /mnt/boot/config.txt > /dev/null
-                echo "disable_overscan=1" | sudo tee -a /mnt/boot/config.txt > /dev/null
-                echo "dtoverlay=vc4-kms-v3d,noaudio" | sudo tee -a /mnt/boot/config.txt > /dev/null
-                echo "max_framebuffers=2" | sudo tee -a /mnt/boot/config.txt > /dev/null
-                echo "gpu_mem=64" | sudo tee -a /mnt/boot/config.txt > /dev/null
-                echo "temp_limit=75" | sudo tee -a /mnt/boot/config.txt > /dev/null
-                echo "dtparam=spi=on" | sudo tee -a /mnt/boot/config.txt > /dev/null
-                echo "dtparam=i2c_arm=on" | sudo tee -a /mnt/boot/config.txt > /dev/null
-                #exit 1
+                #echo "auto_initramfs=1" | sudo tee -a /mnt/boot/config.txt > /dev/null
             fi
             
             # Fix configuration file
+            echo "disable_fw_kms_setup=1" | sudo tee -a /mnt/boot/config.txt > /dev/null
+            echo "disable_overscan=1" | sudo tee -a /mnt/boot/config.txt > /dev/null
+            echo "dtoverlay=vc4-kms-v3d,noaudio" | sudo tee -a /mnt/boot/config.txt > /dev/null
+            echo "max_framebuffers=2" | sudo tee -a /mnt/boot/config.txt > /dev/null
+            echo "gpu_mem=64" | sudo tee -a /mnt/boot/config.txt > /dev/null
+            echo "temp_limit=75" | sudo tee -a /mnt/boot/config.txt > /dev/null
+            echo "dtparam=spi=on" | sudo tee -a /mnt/boot/config.txt > /dev/null
+            echo "dtparam=i2c_arm=on" | sudo tee -a /mnt/boot/config.txt > /dev/null
             echo "dtoverlay=i2c-rtc,ds3231" | sudo tee -a /mnt/boot/config.txt > /dev/null
             echo "display_auto_detect=0" | sudo tee -a /mnt/boot/config.txt > /dev/null
             echo "camera_auto_detect=0" | sudo tee -a /mnt/boot/config.txt > /dev/null
@@ -595,19 +598,14 @@ jobs:
         
         echo "✓ Boot partition configured with files from firmware package"
 
-    - name: Create boot configuration system
-      run: |
-        # Create the configuration processor script
-        echo "✓ Boot configuration system created"
-
     - name: Create system information file
       run: |
         sudo tee /mnt/root/etc/raspine-release << EOF
-        CFPP-100AC Hybrid System
+        CFPP-100AC RPi System
         Build Date: ${BUILD_DATE}
         Alpine Version: ${ALPINE_VERSION}
         Architecture: ${ALPINE_ARCH}
-        Kernel: Raspberry Pi OS (via APK)
+        Kernel: Raspberry Pi OS (linux-rpi)
         Userland: Alpine Linux
         EOF
 
@@ -633,21 +631,13 @@ jobs:
         
         # Create info file
         cat > "RasPINE-${BUILD_DATE}.info.txt" << EOF
-        RasPINE Hybrid Image
+        Alpine Linux for RPi Image
         ====================
         Build Date: ${BUILD_DATE}
         Alpine Version: ${ALPINE_VERSION}
         Architecture: ${ALPINE_ARCH}
         Image Size: $(du -h "RasPINE-${BUILD_DATE}.img.xz" | cut -f1)
         SHA256: $(cut -d' ' -f1 < "RasPINE-${BUILD_DATE}.img.xz.sha256")
-        
-        Default Credentials:
-        Username: cfpp-100ac
-        Password: 12345678
-        
-        Network: WiFi on wlan0 and AP on ap0
-        SSH: Enabled (Dropbear)
-        SFTP: Enabled (Openssh-sftp)
         
         Compatible with all Raspberry Pi models.
         EOF
@@ -664,11 +654,11 @@ jobs:
 
     - name: Create Release
       # Only create release if called directly (not from master workflow)
-      if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+      if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/linux-rpi'
       uses: softprops/action-gh-release@v2
       with:
         tag_name: v${{ env.BUILD_DATE }}
-        name: RasPINE ${{ env.BUILD_DATE }}
+        name: Alpine Linux for RPi ${{ env.BUILD_DATE }}
         draft: false
         prerelease: false
         files: |
@@ -676,9 +666,9 @@ jobs:
           RasPINE-*.img.xz.sha256
           RasPINE-*.info.txt
         body: |
-          # RasPINE Hybrid Image - ${{ env.BUILD_DATE }}
+          # Image - ${{ env.BUILD_DATE }}
           
-          Raspberry Pi OS kernel/firmware with Alpine Linux ${{ env.ALPINE_VERSION }} userland.
+          Alpine Linux ${{ env.ALPINE_VERSION }}.
           
           ## Download
           [Download RasPINE-${{ env.BUILD_DATE }}.img.xz](https://github.com/${{ github.repository }}/releases/download/v${{ env.BUILD_DATE }}/RasPINE-${{ env.BUILD_DATE }}.img.xz)
@@ -687,94 +677,3 @@ jobs:
           Check the SHA256 checksum before use.
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  update-pages:
-    name: Update GitHub Pages
-    needs: build
-    runs-on: ubuntu-latest
-    # Only update pages if called directly AND build succeeded
-    if: |
-      github.event_name == 'workflow_dispatch' && 
-      github.ref == 'refs/heads/main' && 
-      needs.build.result == 'success'
-    
-    permissions:
-      contents: write
-      pages: write
-      id-token: write
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: RasPINE-${{ needs.build.outputs.build_date }}
-        path: build-artifacts/
-
-    - name: Update gh-pages
-      run: |
-        BUILD_DATE="${{ needs.build.outputs.build_date }}"
-        
-        # Clone gh-pages
-        git config --global user.name 'github-actions[bot]'
-        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-        
-        git clone --branch gh-pages --single-branch \
-          https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git \
-          gh-pages || {
-          # Create if doesn't exist
-          mkdir gh-pages
-          cd gh-pages
-          git init
-          git checkout -b gh-pages
-          cd ..
-        }
-        
-        # Clean up old RasPINE files in downloads directory
-        # This removes all RasPINE-YYYY-MM-DD.* files except symlinks
-        if [ -d "gh-pages/downloads" ]; then
-          echo "Cleaning up old RasPINE builds..."
-          cd gh-pages/downloads
-          
-          # Remove all date-specific RasPINE files (but not the -latest symlinks)
-          find . -maxdepth 1 -type f -name "RasPINE-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].*" -delete
-          
-          # Also remove any broken symlinks
-          find . -maxdepth 1 -type l ! -exec test -e {} \; -delete
-          
-          cd ../..
-          echo "Old builds cleaned up"
-        fi
-        
-        # Update downloads
-        mkdir -p gh-pages/downloads
-        cp build-artifacts/*.info.txt gh-pages/downloads/
-        cp build-artifacts/*.sha256 gh-pages/downloads/
-        
-        # Create redirect page
-        echo '<!DOCTYPE html>' > gh-pages/downloads/RasPINE-${BUILD_DATE}.img.xz.html
-        echo '<html>' >> gh-pages/downloads/RasPINE-${BUILD_DATE}.img.xz.html
-        echo '<head>' >> gh-pages/downloads/RasPINE-${BUILD_DATE}.img.xz.html
-        echo '    <meta charset="UTF-8">' >> gh-pages/downloads/RasPINE-${BUILD_DATE}.img.xz.html
-        echo "    <title>Downloading RasPINE-${BUILD_DATE}.img.xz</title>" >> gh-pages/downloads/RasPINE-${BUILD_DATE}.img.xz.html
-        echo "    <meta http-equiv=\"refresh\" content=\"0; url=https://github.com/${{ github.repository }}/releases/download/v${BUILD_DATE}/RasPINE-${BUILD_DATE}.img.xz\">" >> gh-pages/downloads/RasPINE-${BUILD_DATE}.img.xz.html
-        echo '</head>' >> gh-pages/downloads/RasPINE-${BUILD_DATE}.img.xz.html
-        echo '<body>' >> gh-pages/downloads/RasPINE-${BUILD_DATE}.img.xz.html
-        echo '    <p>Redirecting to download...</p>' >> gh-pages/downloads/RasPINE-${BUILD_DATE}.img.xz.html
-        echo '</body>' >> gh-pages/downloads/RasPINE-${BUILD_DATE}.img.xz.html
-        echo '</html>' >> gh-pages/downloads/RasPINE-${BUILD_DATE}.img.xz.html
-        
-        # Update symlinks (using force to overwrite existing)
-        cd gh-pages/downloads
-        ln -sf "RasPINE-${BUILD_DATE}.img.xz.html" "RasPINE-latest.img.xz.html"
-        ln -sf "RasPINE-${BUILD_DATE}.info.txt" "RasPINE-latest.info.txt"
-        ln -sf "RasPINE-${BUILD_DATE}.img.xz.sha256" "RasPINE-latest.img.xz.sha256"
-        cd ../..
-        
-        # Commit and push
-        cd gh-pages
-        git add .
-        git commit -m "Update downloads for build ${BUILD_DATE}" || exit 0
-        git push origin gh-pages
